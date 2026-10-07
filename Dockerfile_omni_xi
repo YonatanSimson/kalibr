@@ -1,0 +1,12 @@
+# kalibr + omni xi / distortion seeding and wide-FOV init fixes (see OMNI_FIXED_XI.md), layered on
+# the arm64 image built by exovision-research/gopro_navigation/run_gopro_kalibr.sh --preflight.
+#   docker build -f Dockerfile_omni_xi -t kalibr_ubuntu2004_omnixi .
+# Only the patched files are copied; catkin rebuilds just the packages that include them
+# (the python file is used from src/ through catkin's devel-space shims).
+FROM kalibr_ubuntu2004
+ARG IMPL=aslam_cv/aslam_cameras/include/aslam/cameras/implementation
+COPY ${IMPL}/OmniProjection.hpp ${IMPL}/DoubleSphereProjection.hpp ${IMPL}/ExtendedUnifiedProjection.hpp \
+     /catkin_ws/src/kalibr/${IMPL}/
+COPY aslam_offline_calibration/kalibr/python/kalibr_camera_calibration/CameraIntializers.py \
+     /catkin_ws/src/kalibr/aslam_offline_calibration/kalibr/python/kalibr_camera_calibration/
+RUN cd /catkin_ws && catkin build -j4 --no-status
