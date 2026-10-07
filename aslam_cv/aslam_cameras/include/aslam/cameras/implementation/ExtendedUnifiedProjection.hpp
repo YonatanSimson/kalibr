@@ -1,3 +1,4 @@
+#include <Eigen/Geometry>
 #include <aslam/cameras/ExtendedUnifiedProjection.hpp>
 #include <aslam/cameras/NoDistortion.hpp>
 
@@ -799,56 +800,59 @@ bool ExtendedUnifiedProjection<DISTORTION_T>::estimateTransformation(
   obs.getCornersImageFrame(Ms);
   obs.getCornersTargetFrame(Ps);
 
-  // Convert all target corners to a fakey pinhole view.
-  size_t count = 0;
+  // Back-project every corner to a unit ray. The pinhole PnP below needs the rays in front of
+  // a virtual camera. Stock kalibr kept only rays within 80 deg of the optical axis, which
+  // drops boards seen near the rim of a > 180 deg lens (every view of the Insta360 X6 rear
+  // lens failed its pose guess). Instead the virtual camera looks along the mean ray: R_v
+  // rotates the mean onto +z and rays within 80 deg of it are kept. See OMNI_FIXED_XI.md.
+  std::vector<Eigen::Vector3d> rays;
+  std::vector<cv::Point3f> targets;
+  Eigen::Vector3d meanRay = Eigen::Vector3d::Zero();
   for (size_t i = 0; i < Ms.size(); ++i) {
-    Eigen::Vector3d targetPoint(Ps[i].x, Ps[i].y, Ps[i].z);
     Eigen::Vector2d imagePoint(Ms[i].x, Ms[i].y);
     Eigen::Vector3d backProjection;
-
-    if (keypointToEuclidean(imagePoint, backProjection)
-        && backProjection.normalized()[2] > std::cos(80.0*M_PI/180.0)) {
-      double x = backProjection[0];
-      double y = backProjection[1];
-      double z = backProjection[2];
-      Ps.at(count).x = targetPoint[0];
-      Ps.at(count).y = targetPoint[1];
-      Ps.at(count).z = targetPoint[2];
-
-      Ms.at(count).x = x / z;
-      Ms.at(count).y = y / z;
-      ++count;
-    } else {
-//      SM_DEBUG_STREAM(
-//          "Skipping point " << i << ", point was observed: " << imagePoint
-//              << ", projection success: "
-//              << keypointToEuclidean(imagePoint, backProjection)
-//              << ", in front of camera: " << (backProjection[2] > 0.0)
-//              << "image point: " << imagePoint.transpose()
-//              << ", backProjection: " << backProjection.transpose()
-//              << ", camera params (xi,fu,fv,cu,cv):" << xi() << ", " << fu()
-//              << ", " << fv() << ", " << cu() << ", " << cv());
+    if (keypointToEuclidean(imagePoint, backProjection) && backProjection.allFinite()
+        && backProjection.norm() > 0.0) {
+      rays.push_back(backProjection.normalized());
+      targets.push_back(Ps[i]);
+      meanRay += rays.back();
     }
   }
+  if (rays.size() < 6 || meanRay.norm() < 1e-9) {
+    return false;
+  }
+  const Eigen::Matrix3d R_v = Eigen::Quaterniond::FromTwoVectors(
+      meanRay.normalized(), Eigen::Vector3d::UnitZ()).toRotationMatrix();
 
-  Ps.resize(count);
-  Ms.resize(count);
+  Ps.clear();
+  Ms.clear();
+  for (size_t i = 0; i < rays.size(); ++i) {
+    const Eigen::Vector3d r = R_v * rays[i];
+    if (r[2] > std::cos(80.0*M_PI/180.0)) {
+      Ps.push_back(targets[i]);
+      Ms.push_back(cv::Point2f(r[0] / r[2], r[1] / r[2]));
+    }
+  }
 
   std::vector<double> distCoeffs(4, 0.0);
 
   cv::Mat rvec(3, 1, CV_64F);
   cv::Mat tvec(3, 1, CV_64F);
 
-  if (Ps.size() < 4) {
-//    SM_DEBUG_STREAM(
-//        "At least 4 points are needed for calling PnP. Found " << Ps.size());
+  // OpenCV >= 4 needs 6 points on this path (it throws, which aborted the whole
+  // initialisation instead of skipping one view). See OMNI_FIXED_XI.md.
+  if (Ps.size() < 6) {
     return false;
   }
 
   // Call the OpenCV pnp function.
 //  SM_DEBUG_STREAM("Calling solvePnP with " << Ps.size() << " world points and "
 //                  << Ms.size() << " image points");
-  cv::solvePnP(Ps, Ms, cv::Mat::eye(3, 3, CV_64F), distCoeffs, rvec, tvec);
+  try {
+    cv::solvePnP(Ps, Ms, cv::Mat::eye(3, 3, CV_64F), distCoeffs, rvec, tvec);
+  } catch (const cv::Exception &) {
+    return false;
+  }
 
   // convert the rvec/tvec to a transformation
   cv::Mat C_camera_model = cv::Mat::eye(3, 3, CV_64F);
@@ -860,6 +864,11 @@ bool ExtendedUnifiedProjection<DISTORTION_T>::estimateTransformation(
       T_camera_model(r, c) = C_camera_model.at<double>(r, c);
     }
   }
+
+  // The pose was solved in the virtual camera; rotate it back into the real one.
+  Eigen::Matrix4d T_real_virtual = Eigen::Matrix4d::Identity();
+  T_real_virtual.topLeftCorner<3, 3>() = R_v.transpose();
+  T_camera_model = T_real_virtual * T_camera_model;
 
   out_T_t_c.set(T_camera_model.inverse());
   return true;

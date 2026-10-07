@@ -218,6 +218,10 @@ def calibrateIntrinsics(cam_geometry, obslist, distortionActive=True, intrinsics
     target_pose_dvs=list()
     for obs in obslist: 
         success, T_t_c = cam_geometry.geometry.estimateTransformation(obs)
+        if not success:
+            # No pose guess for this view (e.g. its corners cannot be lifted with the current
+            # intrinsics): adding it with a garbage pose turns the whole solve to NaN.
+            continue
         target_pose_dv = addPoseDesignVariable(problem, T_t_c)
         target_pose_dvs.append(target_pose_dv)
         

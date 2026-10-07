@@ -1,6 +1,43 @@
+#include <Eigen/Geometry>
+#include <cstdlib>
+#include <cstring>
+#include <sstream>
+#include <vector>
+
 namespace aslam {
 
 namespace cameras {
+
+namespace omni_xi {
+/// KALIBR_OMNI_XI_FIXED=1: keep xi out of the optimisation (see OMNI_FIXED_XI.md).
+inline bool fixed() {
+  static const bool value = [] {
+    const char* s = std::getenv("KALIBR_OMNI_XI_FIXED");
+    return s != nullptr && *s != '\0' && std::strcmp(s, "0") != 0;
+  }();
+  return value;
+}
+/// KALIBR_OMNI_XI_INIT=<xi0>: the xi initializeIntrinsics seeds (default 1).
+inline double init() {
+  const char* s = std::getenv("KALIBR_OMNI_XI_INIT");
+  return s != nullptr && *s != '\0' ? std::atof(s) : 1.0;
+}
+/// KALIBR_OMNI_DIST_INIT="k1 k2 p1 p2" (radtan order): distortion initializeIntrinsics seeds.
+/// Needed with xi > 1: undistorted MEI only lifts r^2 <= 1/(xi^2 - 1), which on a ~190 deg lens
+/// excludes the rim until the radial terms are in place.
+inline std::vector<double> distortionInit() {
+  std::vector<double> v;
+  const char* s = std::getenv("KALIBR_OMNI_DIST_INIT");
+  if (s != nullptr) {
+    std::istringstream is(s);
+    double d;
+    while (is >> d) {
+      v.push_back(d);
+    }
+  }
+  return v;
+}
+}  // namespace omni_xi
 
 template<typename DISTORTION_T>
 OmniProjection<DISTORTION_T>::OmniProjection()
@@ -389,9 +426,7 @@ void OmniProjection<DISTORTION_T>::euclideanToKeypointIntrinsicsJacobian(
   EIGEN_STATIC_ASSERT_MATRIX_SPECIFIC_SIZE_OR_DYNAMIC(
       Eigen::MatrixBase<DERIVED_JI>, (int) KeypointDimension, 5);
 
-  Eigen::MatrixBase<DERIVED_JI> & J =
-      const_cast<Eigen::MatrixBase<DERIVED_JI> &>(outJi);
-  J.derived().resize(KeypointDimension, 5);
+  Eigen::Matrix<double, KeypointDimension, 5> J;
   J.setZero();
 
   keypoint_t kp;
@@ -417,6 +452,16 @@ void OmniProjection<DISTORTION_T>::euclideanToKeypointIntrinsicsJacobian(
   J(1, 2) = kp[1];
   J(1, 4) = 1;
 
+  // With xi fixed the parameter block is [fu fv cu cv]: drop the xi column.
+  Eigen::MatrixBase<DERIVED_JI> & Jout =
+      const_cast<Eigen::MatrixBase<DERIVED_JI> &>(outJi);
+  if (omni_xi::fixed()) {
+    Jout.derived().resize(KeypointDimension, 4);
+    Jout = J.template rightCols<4>();
+  } else {
+    Jout.derived().resize(KeypointDimension, 5);
+    Jout = J;
+  }
 }
 
 template<typename DISTORTION_T>
@@ -635,18 +680,25 @@ void OmniProjection<DISTORTION_T>::updateTemporaries() {
 // aslam::backend compatibility
 template<typename DISTORTION_T>
 void OmniProjection<DISTORTION_T>::update(const double * v) {
-  _xi += v[0];
-  _fu += v[1];
-  _fv += v[2];
-  _cu += v[3];
-  _cv += v[4];
+  if (omni_xi::fixed()) {
+    _fu += v[0];
+    _fv += v[1];
+    _cu += v[2];
+    _cv += v[3];
+  } else {
+    _xi += v[0];
+    _fu += v[1];
+    _fv += v[2];
+    _cu += v[3];
+    _cv += v[4];
+  }
 
   updateTemporaries();
 
 }
 template<typename DISTORTION_T>
 int OmniProjection<DISTORTION_T>::minimalDimensions() const {
-  return 5;
+  return omni_xi::fixed() ? 4 : 5;
 }
 
 template<typename DISTORTION_T>
@@ -832,9 +884,23 @@ bool OmniProjection<DISTORTION_T>::initializeIntrinsics(const std::vector<GridCa
     }  // For each row in the image.
   } //For each image
 
-  //set the parameters
-  _fu = gamma0;
-  _fv = gamma0;
+  //set the parameters. gamma0 was found with xi = 1, where the near-axis focal is gamma0 / 2;
+  //a different seed xi0 keeps that near-axis focal: f = gamma0 * (1 + xi0) / 2.
+  const double xi0 = omni_xi::init();
+  _xi = xi0;
+  _fu = 0.5 * gamma0 * (1.0 + xi0);
+  _fv = _fu;
+  const std::vector<double> d0 = omni_xi::distortionInit();
+  if (!d0.empty()) {
+    Eigen::MatrixXd D;
+    _distortion.getParameters(D);
+    if (static_cast<size_t>(D.size()) == d0.size()) {
+      for (size_t i = 0; i < d0.size(); ++i) {
+        D(i) = d0[i];
+      }
+      _distortion.setParameters(D);
+    }
+  }
   updateTemporaries();
   return success;
 }  // initializeIntrinsics()
@@ -879,56 +945,59 @@ bool OmniProjection<DISTORTION_T>::estimateTransformation(
   obs.getCornersImageFrame(Ms);
   obs.getCornersTargetFrame(Ps);
 
-  // Convert all target corners to a fakey pinhole view.
-  size_t count = 0;
+  // Back-project every corner to a unit ray. The pinhole PnP below needs the rays in front of
+  // a virtual camera. Stock kalibr kept only rays within 80 deg of the optical axis, which
+  // drops boards seen near the rim of a > 180 deg lens (every view of the Insta360 X6 rear
+  // lens failed its pose guess). Instead the virtual camera looks along the mean ray: R_v
+  // rotates the mean onto +z and rays within 80 deg of it are kept. See OMNI_FIXED_XI.md.
+  std::vector<Eigen::Vector3d> rays;
+  std::vector<cv::Point3f> targets;
+  Eigen::Vector3d meanRay = Eigen::Vector3d::Zero();
   for (size_t i = 0; i < Ms.size(); ++i) {
-    Eigen::Vector3d targetPoint(Ps[i].x, Ps[i].y, Ps[i].z);
     Eigen::Vector2d imagePoint(Ms[i].x, Ms[i].y);
     Eigen::Vector3d backProjection;
-
-    if (keypointToEuclidean(imagePoint, backProjection)
-        && backProjection.normalized()[2] > std::cos(80.0*M_PI/180.0)) {
-      double x = backProjection[0];
-      double y = backProjection[1];
-      double z = backProjection[2];
-      Ps.at(count).x = targetPoint[0];
-      Ps.at(count).y = targetPoint[1];
-      Ps.at(count).z = targetPoint[2];
-
-      Ms.at(count).x = x / z;
-      Ms.at(count).y = y / z;
-      ++count;
-    } else {
-//      SM_DEBUG_STREAM(
-//          "Skipping point " << i << ", point was observed: " << imagePoint
-//              << ", projection success: "
-//              << keypointToEuclidean(imagePoint, backProjection)
-//              << ", in front of camera: " << (backProjection[2] > 0.0)
-//              << "image point: " << imagePoint.transpose()
-//              << ", backProjection: " << backProjection.transpose()
-//              << ", camera params (xi,fu,fv,cu,cv):" << xi() << ", " << fu()
-//              << ", " << fv() << ", " << cu() << ", " << cv());
+    if (keypointToEuclidean(imagePoint, backProjection) && backProjection.allFinite()
+        && backProjection.norm() > 0.0) {
+      rays.push_back(backProjection.normalized());
+      targets.push_back(Ps[i]);
+      meanRay += rays.back();
     }
   }
+  if (rays.size() < 6 || meanRay.norm() < 1e-9) {
+    return false;
+  }
+  const Eigen::Matrix3d R_v = Eigen::Quaterniond::FromTwoVectors(
+      meanRay.normalized(), Eigen::Vector3d::UnitZ()).toRotationMatrix();
 
-  Ps.resize(count);
-  Ms.resize(count);
+  Ps.clear();
+  Ms.clear();
+  for (size_t i = 0; i < rays.size(); ++i) {
+    const Eigen::Vector3d r = R_v * rays[i];
+    if (r[2] > std::cos(80.0*M_PI/180.0)) {
+      Ps.push_back(targets[i]);
+      Ms.push_back(cv::Point2f(r[0] / r[2], r[1] / r[2]));
+    }
+  }
 
   std::vector<double> distCoeffs(4, 0.0);
 
   cv::Mat rvec(3, 1, CV_64F);
   cv::Mat tvec(3, 1, CV_64F);
 
-  if (Ps.size() < 4) {
-//    SM_DEBUG_STREAM(
-//        "At least 4 points are needed for calling PnP. Found " << Ps.size());
+  // OpenCV >= 4 needs 6 points on this path (it throws, which aborted the whole
+  // initialisation instead of skipping one view). See OMNI_FIXED_XI.md.
+  if (Ps.size() < 6) {
     return false;
   }
 
   // Call the OpenCV pnp function.
 //  SM_DEBUG_STREAM("Calling solvePnP with " << Ps.size() << " world points and "
 //                  << Ms.size() << " image points");
-  cv::solvePnP(Ps, Ms, cv::Mat::eye(3, 3, CV_64F), distCoeffs, rvec, tvec);
+  try {
+    cv::solvePnP(Ps, Ms, cv::Mat::eye(3, 3, CV_64F), distCoeffs, rvec, tvec);
+  } catch (const cv::Exception &) {
+    return false;
+  }
 
   // convert the rvec/tvec to a transformation
   cv::Mat C_camera_model = cv::Mat::eye(3, 3, CV_64F);
@@ -940,6 +1009,11 @@ bool OmniProjection<DISTORTION_T>::estimateTransformation(
       T_camera_model(r, c) = C_camera_model.at<double>(r, c);
     }
   }
+
+  // The pose was solved in the virtual camera; rotate it back into the real one.
+  Eigen::Matrix4d T_real_virtual = Eigen::Matrix4d::Identity();
+  T_real_virtual.topLeftCorner<3, 3>() = R_v.transpose();
+  T_camera_model = T_real_virtual * T_camera_model;
 
   out_T_t_c.set(T_camera_model.inverse());
   return true;

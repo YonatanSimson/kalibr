@@ -1,0 +1,137 @@
+# Omni (MEI) with a configurable / fixed ξ — plan and status
+
+Goal: calibrate the Insta360 X6 lenses with kalibr's `omni-radtan` (MEI) model while ξ is held at
+the factory value (X6: 2.45543, X4/X5: 2.0), so fx, fy, cx, cy can be compared with the factory
+record term by term. Stock kalibr always seeds ξ = 1 and always optimises it.
+
+## Change (aslam_cameras / OmniProjection.hpp only)
+
+Two environment variables, read by `OmniProjection`:
+
+| variable | effect |
+|---|---|
+| `KALIBR_OMNI_XI_INIT=<ξ0>` | `initializeIntrinsics` seeds ξ = ξ0 instead of 1. The line-fit focal estimate γ is made with ξ = 1, where the near-axis focal is γ/2; it is converted to f = γ(1+ξ0)/2 so the seed keeps the same near-axis focal. |
+| `KALIBR_OMNI_XI_FIXED=1` | ξ leaves the optimisation: `minimalDimensions()` 5 → 4, `update()` skips ξ, the intrinsics Jacobian drops its ξ column. ξ stays at whatever it was set to (the seed, or a camchain value). |
+
+Why drop the parameter rather than zero its Jacobian column: kalibr's incremental estimator
+uses a rank-revealing solve to decide which views add information; a dead column is a
+permanent rank deficiency, and the LM damping is diagonal-scaled, so a zero column stays
+singular. Removing the dimension keeps the problem well-posed. The Jacobians are stacked into
+dynamic `Eigen::MatrixXd` by `CameraGeometry`, sized from `minimalDimensions()`, so a 4-column
+projection block is consumed correctly.
+
+Caveat: `DoubleSphereProjection` / `ExtendedUnifiedProjection::initializeIntrinsics` call the
+omni initialiser internally and assume ξ = 1. The variables must be set only for omni runs
+(the Insta360 runner does that per kalibr invocation).
+
+## Bug fix found on the way: PnP with < 6 points aborts the calibration
+
+Stock kalibr fails on the X6 (193° FOV) for **every** omni-initialised model (omni, ds, eucm):
+
+    RuntimeError: OpenCV(4.2.0) calibration.cpp:1171: cvFindExtrinsicCameraParams2
+    DLT algorithm needs at least 6 points ... 'count' is 5
+
+`estimateTransformation` (Omni-, DoubleSphere-, ExtendedUnifiedProjection.hpp) back-projects the
+corners, keeps those within 80° of the axis, and calls `cv::solvePnP` if at least **4** remain.
+OpenCV 4.x needs 6 there and throws; nothing catches it, so one bad candidate view during the
+focal-length line search aborts `initializeIntrinsics`. Fix (all three headers): require 6 points
+and treat a `cv::Exception` from `solvePnP` as "pose not estimated" (return false), which is what
+every caller already handles.
+
+## Bug fix 2: pose guess discards boards near the rim
+
+`estimateTransformation` (same three headers) also keeps only corners whose back-projected ray
+is within 80° of the **optical axis** before the pinhole PnP. On a 193° lens a board seen near
+the rim has few or no such corners, so its pose guess fails. On the X6 rear lens (cam1) almost
+every view failed, kalibr started the optimisation with 1 usable view and diverged to NaN.
+Fix: keep every corner that back-projects, rotate the rays so their mean is +z (a virtual pinhole
+looking at the board), keep rays within 80° of that, solve PnP there and rotate the pose back.
+Same pose for central boards; rim boards now get one too.
+
+## Fix 3: omni with ξ > 1 needs its distortion seeded too
+
+Omni ξ = 2.45543 (fixed or seeded) gave NaN intrinsics on both lenses. Undistorted MEI only lifts a
+normalised radius r² ≤ 1/(ξ² − 1): r ≤ 0.446 at ξ = 2.455, while the X6 rim sits at r ≈ 0.52. The
+factory reaches the rim through its radial terms (k1 = 1.30, ...); kalibr starts distortion at 0,
+so no rim corner lifts. Stock kalibr never hits this because it seeds ξ = 1 (no limit).
+- `KALIBR_OMNI_DIST_INIT="k1 k2 p1 p2"`: `initializeIntrinsics` also seeds the distortion
+  (any distortion model; the count must match its parameter vector).
+- `CameraIntializers.calibrateIntrinsics` skipped nothing when a view's pose guess failed and added
+  it with a garbage pose → NaN. Failed views are now skipped.
+Runner: `--omni-dist "1.30284 -0.99313 0 0"` (X6 factory k1, k2).
+
+## Build
+
+New image `kalibr_ubuntu2004_omnixi`, layered on `kalibr_ubuntu2004`: copy the patched header in
+and run an incremental `catkin build` (only packages that include aslam_cameras rebuild).
+
+## Test plan
+
+1. [ ] Patch compiles (incremental catkin build in the layered image).
+0. [x] Stock image on the X6 take: ds-none and eucm-none both abort in initializeIntrinsics (bug above).
+1a. [x] Image v2 (`kalibr_ubuntu2004_omnixi2`, bug fix 2): DS cam1 initialises (failed to NaN on v1).
+1b. [x] DS/EUCM initialise and converge on both lenses (DS cam0 legal only on v1, see log).
+2. [ ] Unit tests: `aslam_cameras` gtest (`CameraGeometryTestHarness` checks analytic vs
+       finite-difference intrinsics Jacobians) — run with the variables unset (must be
+       unchanged) and with `KALIBR_OMNI_XI_FIXED=1` (4-column Jacobian must match the finite
+       difference on the remaining parameters).
+3. [ ] Regression: with the variables unset the patch only changes views where stock would have
+       thrown. Stock cannot run this take at all, so compare stock vs patched on a take stock can
+       calibrate (or on a frame subset) — results must be identical.
+4. [x] Seed only: `KALIBR_OMNI_XI_INIT=2.45543` — converges; compare with the ξ = 1 seed.
+5. [x] Fixed: `KALIBR_OMNI_XI_INIT=2.45543 KALIBR_OMNI_XI_FIXED=1` — output camchain has
+       ξ = 2.45543 exactly; reprojection error close to the free-ξ run.
+6. [-] ξ = 2.0 (X4/X5 convention): dropped for the X6 (user, 2026-10-07); `test_omni_xi.sh fixed2` keeps it for X4/X5.
+7. [x] Factory comparison: fx, fy, cx, cy vs the X6 `offset_v6` record
+       (`insta360_compare_factory.py`). kalibr's radtan has k1, k2 only (factory uses k1..k4),
+       so k-terms will not match term by term; focal/principal point should be close.
+
+## Stretch: factory-form MEI distortion (only if fixed ξ works)
+
+kalibr's `radtan` has k1, k2, p1, p2; the Insta360 factory model is radial k1..k4 (to r⁸) + p1, p2
+(+ further terms on X5/X6). To fit the factory form term by term inside kalibr:
+
+- new distortion class (e.g. `RadialTangential4Distortion`: k1..k4, p1, p2) next to
+  `RadialTangentialDistortion` — distort / undistort (iterative) / Jacobians wrt point and params;
+- instantiate `OmniProjection<RadialTangential4Distortion>` + camera geometry typedef, python
+  bindings (aslam_cv_python), and register `radtan4` in `kalibr_common/ConfigReader.py`
+  (`omni-radtan4`), plus camchain read/write;
+- test as above: Jacobians vs finite differences, then ξ fixed at the factory value and compare
+  all of fx, fy, cx, cy, k1..k4, p1, p2 with `offset_v6`.
+
+Meanwhile the term-by-term comparison is covered outside kalibr by the fixed-ξ MEI refit
+(k1..k4, p1, p2) in exovision-research `map_3d/calibration/insta360_compare_factory.py`.
+
+## Status log
+
+- 2026-10-07: plan written; DS/EUCM baseline run in progress on the stock image.
+- 2026-10-07: patch applied to `OmniProjection.hpp` (`omni_xi::fixed()`, `omni_xi::init()`;
+  Jacobian built into a local 2x5 then copied out as 2x4/2x5; `update`, `minimalDimensions`,
+  seed conversion). Both variables unset ⇒ code path identical to stock (seed ξ = 1, f = γ).
+  `Dockerfile_omni_xi` added; first image build OK (36/36 packages).
+- 2026-10-07: baseline DS/EUCM on the stock image failed (PnP bug above). Guard added to the three
+  projection headers; Dockerfile copies all three; image rebuilding. DS/EUCM baseline will be
+  rerun on the patched image (variables unset).
+- 2026-10-07: patched image rebuilt (36/36 OK). Queue on the X6 take: DS + EUCM (intrinsics, cam-IMU per
+  lens, joint) → omni ξ fixed 2.45543 → omni ξ seeded 2.45543 (both intrinsics only).
+- 2026-10-07: v1 image: DS cam0 converged (ξ −0.025, α 0.596, fu 814.0, fv 818.7; ±3 px); cam-IMU
+  cam0 OK (R ≈ axis-aligned within 1.1°, |t| 32 mm, shift −3.0 ms). DS cam1 → NaN, 1/80 views used:
+  bug fix 2 above. Building `kalibr_ubuntu2004_omnixi2`; queued v1 runs left as they are.
+- 2026-10-07: v1 image, EUCM cam0 diverged (α → −65526). v2 image built (36/36 OK) and tagged as
+  both `kalibr_ubuntu2004_omnixi2` and `kalibr_ubuntu2004_omnixi` (runner default). v1 results kept
+  as `ds_v1img/`, `eucm_v1img/`; everything reruns on v2. DS cam1 test on v2 running (`ds_v2/`).
+- 2026-10-07: v2 queue done. DS: cam0 legal only on v1 (±3 px; v2 → α < 0, MEI-like ξ 2.57, ±1.1 px),
+  cam1 ±4 px, joint OK (baseline 47.7 mm, 1.25° from factory). EUCM: cam0 ±0.95 px, cam1 ±1.1 px,
+  joint OK, near-axis focal 819.1 vs factory 818.7. Omni ξ 2.45543 fixed/seeded → NaN: fix 3 above.
+  Dockerfile context is now the repo root (4 files copied). Building `kalibr_ubuntu2004_omnixi3`.
+- 2026-10-07: v3 image (fix 3). Omni with ξ 2.45543 + factory k1,k2 seed (X6, cam0 / cam1):
+  - ξ fixed:  fu 2837.6 / 2828.3, cu 1501.4 / 1490.7, k1 1.17, k2 +0.28 / +0.54; ±0.96 / ±1.28 px.
+  - ξ seeded, free: ξ → 2.116 / 2.260, fu 2542 / 2657, ±0.85 / ±1.07 px (slightly better fit).
+  - Corner median (held-out frames, independent detector), cam0 / cam1: factory 1.11 / 1.26, omni fixed
+    1.11 / 1.18, omni free 1.09 / 1.10, EUCM 1.06 / 1.58, DS 2.26 / 2.99, our k1..k4 MEI refit 0.93 / 1.14.
+  Conclusion: with k1, k2 only, ξ trades against focal and k (free ξ drifts to ~2.1-2.3 at equal fit);
+  fixing ξ at the factory value is what makes kalibr's numbers comparable to the factory. Our k1..k4
+  refit keeps ξ at 2.4556 when free → the k3, k4 stretch goal is what lets kalibr match term by term.
+  Still open: test 2 (gtest Jacobians with ξ fixed) and test 3 (stock-vs-patched regression on a take
+  stock can calibrate).
+- v3 image retagged as `kalibr_ubuntu2004_omnixi` (runner default).
