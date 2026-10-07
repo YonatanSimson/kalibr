@@ -110,8 +110,8 @@ Files deleted since the base are not removed from the image.
 1b. [x] DS/EUCM initialise and converge on both lenses (DS cam0 legal only on v1, see log).
 2. [x] Unit tests: `aslam_cameras` gtest (`CameraGeometryTestHarness` checks analytic vs
        finite-difference intrinsics Jacobians) — run with the variables unset (must be
-       unchanged) and with `KALIBR_OMNI_XI_FIXED=1` (4-column Jacobian must match the finite
-       difference on the remaining parameters).
+       unchanged); `test*FixedXi` switch fixed ξ on in-process (`omni_xi::setFixed`) and check
+       the 4-column Jacobian against finite differences at ξ = 0.5, 1, 2, 2.5, 3 (radtan, radtan4).
 3. [x] Regression: with the variables unset the patch only changes views where stock would have
        thrown. Stock cannot run this take at all, so compare stock vs patched on a take stock can
        calibrate (or on a frame subset) — results must be identical.
@@ -217,3 +217,8 @@ Meanwhile the term-by-term comparison is covered outside kalibr by the fixed-ξ 
   BOOST_CLASS_EXPORT. Added `Radtan4DistortedOmni[Rs]CameraGeometry` to aslam_cv_serialization
   (`CameraBaseSerialization.hpp` keys, `src/autogen/Camera-*.cpp`, `autogen_cameras.cmake`, and the
   `gen_files.py` list so a regeneration keeps them). Note: FovDistortedOmni is not registered upstream either.
+- 2026-10-07: review fixes (commit on top). Fixed-ξ gtests no longer need the env var: `omni_xi::setFixed`
+  overrides it in-process, and `testDistortedOmniFixedXi` / `testRadtan4DistortedOmniFixedXi` run at
+  ξ = 0.5, 1, 2, 2.5, 3 (Jacobian vs finite difference and vs the free-ξ Jacobian minus its ξ column,
+  update() leaves ξ alone). Test points come from lifted pixels: `createRandomKeypoint` divides by
+  ξ² − 1 and never returns at ξ = 1.
