@@ -237,7 +237,10 @@ def calibrateIntrinsics(cam_geometry, obslist, distortionActive=True, intrinsics
                 reprojectionErrors.append(rerr)
                                                     
     sm.logDebug("calibrateIntrinsics: added {0} camera error terms".format(len(reprojectionErrors)))
-    
+    if len(target_pose_dvs) == 0:
+        sm.logError("calibrateIntrinsics: no view has a pose guess, nothing to optimise")
+        return False
+
     ############################################
     ## solve
     ############################################       

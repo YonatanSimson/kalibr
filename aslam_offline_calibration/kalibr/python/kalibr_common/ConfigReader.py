@@ -105,6 +105,7 @@ class AslamCamera(object):
                 self.frameType = cv.Radtan4DistortedOmniFrame
                 self.keypointType = cv.Keypoint2
                 self.reprojectionErrorType = cvb.Radtan4DistortedOmniReprojectionErrorSimple
+                # no undistorterType: OmniUndistorter is built for RadialTangentialDistortion only
 
             elif dist_model == 'equidistant':
                 

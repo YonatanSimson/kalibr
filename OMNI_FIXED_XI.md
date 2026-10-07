@@ -40,9 +40,9 @@ Results and the factory comparison: `~/data/calibration/insta360/BXEA3ABHFQ7YSX/
 (`factory_comparison.md`), produced by exovision-research `map_3d/calibration/run_insta360_kalibr.sh`
 and `insta360_compare_factory.py`.
 
-## Change (aslam_cameras / OmniProjection.hpp only)
+## Change (fixed / seeded ξ, OmniProjection.hpp)
 
-Two environment variables, read by `OmniProjection`:
+Environment variables read by `OmniProjection` (`KALIBR_OMNI_DIST_INIT` is under fix 3 below):
 
 | variable | effect |
 |---|---|
@@ -98,12 +98,13 @@ Runner: `--omni-dist "1.30284 -0.99313 0 0"` (X6 factory k1, k2).
 
 ## Build
 
-New image `kalibr_ubuntu2004_omnixi`, layered on `kalibr_ubuntu2004`: copy the patched header in
-and run an incremental `catkin build` (only packages that include aslam_cameras rebuild).
+`./build_omni_xi_image.sh [tag]` (default `kalibr_ubuntu2004_omnixi`), layered on `kalibr_ubuntu2004`:
+packs every file changed since the upstream base commit and runs an incremental `catkin build`.
+Files deleted since the base are not removed from the image.
 
 ## Test plan
 
-1. [ ] Patch compiles (incremental catkin build in the layered image).
+1. [x] Patch compiles (incremental catkin build in the layered image).
 0. [x] Stock image on the X6 take: ds-none and eucm-none both abort in initializeIntrinsics (bug above).
 1a. [x] Image v2 (`kalibr_ubuntu2004_omnixi2`, bug fix 2): DS cam1 initialises (failed to NaN on v1).
 1b. [x] DS/EUCM initialise and converge on both lenses (DS cam0 legal only on v1, see log).

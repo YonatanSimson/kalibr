@@ -398,6 +398,9 @@ class MonoCameraValidator(object):
             self.image_sub = message_filters.Subscriber(self.topic, Image)
         
         #create image undistorter
+        if not hasattr(self.camera, 'undistorterType'):
+            # e.g. omni-radtan4: OmniUndistorter is built for radtan only
+            raise RuntimeError("kalibr_camera_validator has no undistorter for this camera model")
         alpha = 1.0
         scale = 1.0
         self.undistorter = self.camera.undistorterType(self.camera.geometry, cv2.INTER_LINEAR, alpha, scale)
