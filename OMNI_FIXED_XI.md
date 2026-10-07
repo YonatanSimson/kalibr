@@ -244,7 +244,8 @@ Meanwhile the term-by-term comparison is covered outside kalibr by the fixed-ξ 
   it), same fit; fu moves along DS's ξ–α–f near-degeneracy. Fixed-ξ / init / distortion-seed options are
   inert when unset. Also on the review build: unit tests 26 pass + the 2 pre-existing GridCalibration
   failures; both fixed-ξ gtests pass; X6 legacy omni (ξ seed 1, free) converges, ξ 1.82 / 1.93,
-  σ 0.84 / 1.17 px. Outputs: session scratchpad `gopro_regression/{stock,reviewed}/` and
+  σ 0.84 / 1.17 px. Outputs:
+  `~/data/calibration/gopro/C3531325057330/1080_30_16x9_wide/regression_review/{stock,reviewed}/` and
   `~/data/calibration/insta360/review_rerun/`.
 - 2026-10-07: **kalibr is non-deterministic by default**: `kalibr_calibrate_cameras` shuffles the view order
   (`random.shuffle`, unseeded) unless `--no-shuffle` is given. Two shuffled X6 runs on the same image
