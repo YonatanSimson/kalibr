@@ -7,6 +7,7 @@
 #include <aslam/cameras/EquidistantDistortion.hpp>
 #include <aslam/cameras/FovDistortion.hpp>
 #include <aslam/cameras/RadialTangentialDistortion.hpp>
+#include <aslam/cameras/RadialTangential4Distortion.hpp>
 #include <boost/serialization/nvp.hpp>
 #include <sm/python/boost_serialization_pickle.hpp>
 #include <sm/python/unique_register_ptr_to_python.hpp>
@@ -225,6 +226,22 @@ void exportFovDistortionFunctions() {
   exportGenericDistortionFunctions<FovDistortion>(distortion);
   distortion.def(init<double>(("FovDistortion(double w)")));
   distortion.def("w", &FovDistortion::w);
+}
+
+void exportRadialTangential4DistortionFunctions() {
+  class_<RadialTangential4Distortion, boost::shared_ptr<RadialTangential4Distortion> > distortion(
+      "RadialTangential4Distortion", init<>());
+  sm::python::unique_register_ptr_to_python<boost::shared_ptr<RadialTangential4Distortion> >();
+
+  exportGenericDistortionFunctions<RadialTangential4Distortion>(distortion);
+  distortion.def(init<double, double, double, double, double, double>(
+      ("RadialTangential4Distortion(double k1, double k2, double p1, double p2, double k3, double k4)")));
+  distortion.def("k1", &RadialTangential4Distortion::k1);
+  distortion.def("k2", &RadialTangential4Distortion::k2);
+  distortion.def("p1", &RadialTangential4Distortion::p1);
+  distortion.def("p2", &RadialTangential4Distortion::p2);
+  distortion.def("k3", &RadialTangential4Distortion::k3);
+  distortion.def("k4", &RadialTangential4Distortion::k4);
 }
 
 void exportRadialTangentialDistortionFunctions() {
@@ -446,6 +463,7 @@ void exportCameraProjections() {
   //exportGenericProjectionDesignVariable<NoDistortion>("NoDistortion");
 
   exportRadialTangentialDistortionFunctions();
+  exportRadialTangential4DistortionFunctions();
   exportFovDistortionFunctions();
 
   exportPinholeProjection<NoDistortion>("PinholeProjection");
@@ -459,6 +477,7 @@ void exportCameraProjections() {
   exportOmniProjection<NoDistortion>("OmniProjection");
   exportOmniProjection<RadialTangentialDistortion>("DistortedOmniProjection");
   exportOmniProjection<FovDistortion>("FovOmniProjection");
+  exportOmniProjection<RadialTangential4Distortion>("Radtan4DistortedOmniProjection");
 
   exportExtendedUnifiedProjection<NoDistortion>("ExtendedUnifiedProjection");
 

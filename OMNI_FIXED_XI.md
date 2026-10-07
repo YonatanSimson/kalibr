@@ -4,6 +4,42 @@ Goal: calibrate the Insta360 X6 lenses with kalibr's `omni-radtan` (MEI) model w
 the factory value (X6: 2.45543, X4/X5: 2.0), so fx, fy, cx, cy can be compared with the factory
 record term by term. Stock kalibr always seeds ξ = 1 and always optimises it.
 
+## Summary (2026-10-07, Insta360 X6 sn BXEA3ABHFQ7YSX, 3008×3008 @ 24 fps)
+
+We calibrated both lenses with DS, EUCM and MEI, ended on **MEI with the distortion extended to
+k1..k4** (`omni-radtan4`, the form Insta360 stores per unit), and added an option to **fix ξ** —
+which is what made the MEI parameters meaningful.
+
+- **DS — ruled out.** Its free optimum on this lens needs α < 0, outside the legal range, so legal
+  DS stalls at ±3 px and fails at the rim (23 px median beyond 90°).
+- **EUCM — good compact alternative.** 6 parameters, inner-field median ≈ 1.0 px (cam0), and
+  stable without any fixing: α, β ≈ (0.67, 0.78) in every solve, both lenses and the joint solve.
+  It has no ξ and no ξ-style degeneracy, so the fixed-ξ option does not apply to it. Its numbers
+  are not comparable to the factory record term by term (different parameterisation), only by
+  projection.
+- **MEI — chosen.** Insta360's own model; the factory record (`offset_v6`) is accurate to ≈ 1.1 px
+  median on our corners, and a k1..k4 refit in that form lands within 0.2 % focal / 0.5 px
+  principal point of it.
+- **Fixed ξ made the difference — for MEI.** Free ξ trades against focal length and the k-terms:
+  kalibr drifted to ξ 2.1–2.3 (k1, k2) or 2.5 (k1..k4) at equal fit, with fx moving 10 % and k3/k4
+  swinging (k4 up to +83). Fixed at the factory 2.45543 the parameters line up with the factory's.
+- **k1..k4 vs k1, k2 (ξ fixed).** kalibr's own error drops 12–15 % (cam0 ±0.96/0.87 → ±0.82/0.78 px,
+  cam1 ±1.28/1.09 → ±1.12/1.00 px); k1, k2 now match the factory in sign and size (k1, k2-only gave
+  k2 = +0.28 vs factory −0.99); on independent corners cam1's RMSE roughly halves (≈ 6.3 → 3.9 px).
+  k3, k4 are not yet determined (cam1 k3 8.2 / k4 −7.0 vs factory 3.1 / 8.9).
+- **What kalibr needed** (all below): seeding ξ and the distortion (MEI with ξ > 1 cannot lift rim
+  pixels otherwise), three wide-FOV fixes (PnP with < 6 points, pose guess dropping rim boards,
+  failed pose guesses turning the intrinsics pre-solve NaN), and serialization registration for the
+  new geometry. Patched vs stock: same unit-test results; on a take stock can calibrate, equal or
+  better fit.
+- **Open:** the recording has almost no board views past 90° (14 / 19 rim corners vs ≈ 21,600 /
+  4,000 inside). A take with the board held at each lens's edge is needed to fix k3, k4 and to rank
+  the models at the rim.
+
+Results and the factory comparison: `~/data/calibration/insta360/BXEA3ABHFQ7YSX/3008_24/`
+(`factory_comparison.md`), produced by exovision-research `map_3d/calibration/run_insta360_kalibr.sh`
+and `insta360_compare_factory.py`.
+
 ## Change (aslam_cameras / OmniProjection.hpp only)
 
 Two environment variables, read by `OmniProjection`:
@@ -71,11 +107,11 @@ and run an incremental `catkin build` (only packages that include aslam_cameras 
 0. [x] Stock image on the X6 take: ds-none and eucm-none both abort in initializeIntrinsics (bug above).
 1a. [x] Image v2 (`kalibr_ubuntu2004_omnixi2`, bug fix 2): DS cam1 initialises (failed to NaN on v1).
 1b. [x] DS/EUCM initialise and converge on both lenses (DS cam0 legal only on v1, see log).
-2. [ ] Unit tests: `aslam_cameras` gtest (`CameraGeometryTestHarness` checks analytic vs
+2. [x] Unit tests: `aslam_cameras` gtest (`CameraGeometryTestHarness` checks analytic vs
        finite-difference intrinsics Jacobians) — run with the variables unset (must be
        unchanged) and with `KALIBR_OMNI_XI_FIXED=1` (4-column Jacobian must match the finite
        difference on the remaining parameters).
-3. [ ] Regression: with the variables unset the patch only changes views where stock would have
+3. [x] Regression: with the variables unset the patch only changes views where stock would have
        thrown. Stock cannot run this take at all, so compare stock vs patched on a take stock can
        calibrate (or on a frame subset) — results must be identical.
 4. [x] Seed only: `KALIBR_OMNI_XI_INIT=2.45543` — converges; compare with the ξ = 1 seed.
@@ -98,6 +134,19 @@ kalibr's `radtan` has k1, k2, p1, p2; the Insta360 factory model is radial k1..k
   (`omni-radtan4`), plus camchain read/write;
 - test as above: Jacobians vs finite differences, then ξ fixed at the factory value and compare
   all of fx, fy, cx, cy, k1..k4, p1, p2 with `offset_v6`.
+
+Status: **started 2026-10-07** (ξ fix worked; user go-ahead). Wiring, modelled on `RadialTangentialDistortion`:
+
+| layer | file(s) |
+|---|---|
+| distortion class `RadialTangential4Distortion` (k1..k4, p1, p2; distort + Jacobians wrt point and params, iterative undistort, serialization) | `aslam_cameras/include/aslam/cameras/RadialTangential4Distortion.hpp`, `implementation/…`, `src/…`, `CMakeLists.txt` |
+| geometry typedefs + factory strings (`Radtan4DistortedOmni`, `…Rs`) | `aslam/cameras.hpp`, `src/CameraGeometryBase.cpp` |
+| python bindings | `aslam_cv_python/src/CameraProjections.cpp` (+ geometry/frame exports) |
+| backend errors / design variables / camera model | `aslam_cv_backend_python/src/module.cpp`, `python/aslam_cv_backend/__init__.py` |
+| kalibr model name `omni-radtan4` | `kalibr_common/ConfigReader.py` (read, validate, print, write), `kalibr_camera_calibration/CameraUtils.py` |
+| tests | `aslam_cameras/test/RadialTangential4Distortion.cpp` (Jacobians vs finite differences, distort/undistort round trip), harness on the new omni geometry |
+
+`KALIBR_OMNI_DIST_INIT` already seeds any distortion whose parameter count matches (6 values for radtan4).
 
 Meanwhile the term-by-term comparison is covered outside kalibr by the fixed-ξ MEI refit
 (k1..k4, p1, p2) in exovision-research `map_3d/calibration/insta360_compare_factory.py`.
@@ -135,3 +184,35 @@ Meanwhile the term-by-term comparison is covered outside kalibr by the fixed-ξ 
   Still open: test 2 (gtest Jacobians with ξ fixed) and test 3 (stock-vs-patched regression on a take
   stock can calibrate).
 - v3 image retagged as `kalibr_ubuntu2004_omnixi` (runner default).
+- 2026-10-07: tests. New gtest `testDistortedOmniFixedXi` (aslam_cameras/test/OmniCameraGeometry.cpp; runs only
+  with KALIBR_OMNI_XI_FIXED=1): minimalDimensions 4, analytic 2x4 Jacobian == finite difference wrt
+  [fu fv cu cv], update() leaves xi alone — PASS. Jacobian copy rewritten with dynamic blocks (the
+  fixed-size 2x5 test types would not compile with `rightCols<4>`). Full suite, variables unset:
+  stock 18/22, patched 19/23 (the extra one is the new test) — the same 4 fail on both
+  (testTriangulationNoisy, GridCalibration x3: relative image paths / random noise; 3 fail when run
+  from aslam_cameras/test). No regression.
+- 2026-10-07: regression, GoPro 1080/30 wide (C3531325057330, stock can calibrate it), variables unset,
+  stock `kalibr_ubuntu2004` vs patched v3 (reprojection σ x/y px):
+  DS 0.40/0.38 → 0.36/0.31 (different minimum: ξ −0.28→−0.09, fu 628→796 — DS ξ/α/f are near-degenerate),
+  EUCM 0.38/0.36 → 0.37/0.33 (≈ same params, cu +4 px), omni-radtan 0.37/0.32 → 0.39/0.33 (≈ identical:
+  ξ 1.228/1.223, fu 1944.8/1945.0). Not bit-identical — fix 2 changes the pose guesses, and kalibr's
+  incremental view selection follows them — but no loss of fit. Outputs:
+  `~/data/calibration/gopro/C3531325057330/1080_30_16x9_wide/regression_omnixi/{stock,patched}/`.
+- 2026-10-07: stretch goal started — `RadialTangential4Distortion` (header, implementation, src, CMake,
+  typedefs `Radtan4DistortedOmni[Rs]CameraGeometry`, factory strings) + gtests written; bindings next.
+- 2026-10-07: radtan4 wired end to end: python bindings (aslam_cv: distortion, projection, geometries,
+  frames; backend: reprojection errors, design variables, `Radtan4DistortedOmni` camera model), kalibr
+  (`omni-radtan4` in kalibr_calibrate_cameras, ConfigReader `radtan4` = 6 coeffs [k1 k2 p1 p2 k3 k4],
+  CameraUtils output maps, omni intrinsics pre-pass also for radtan4). Image build now
+  `./build_omni_xi_image.sh [tag]`: layers every file changed since 1f60227 (no per-file Dockerfile edits).
+  Insta360 runner: model `omni4`; `--omni-dist` takes 6 values for it. Building `kalibr_ubuntu2004_omnixi4`.
+- 2026-10-07: v4 image (`kalibr_ubuntu2004_omnixi4`, 21 changed files) builds 36/36; python import OK.
+  radtan4 gtests: parameter Jacobian, point Jacobian, distort/undistort round trip to r 0.45 with X6
+  factory terms, harness on Radtan4DistortedOmni — all PASS (parameter-Jacobian check uses abs+rel
+  tolerance: near the axis the r^6/r^8 columns are below finite-difference resolution). Suite from
+  aslam_cameras/test: 25 pass, the 2 pre-existing GridCalibration failures remain.
+- 2026-10-07: first omni4 X6 run failed in corner extraction ("unregistered class - derived class not
+  registered or exported"): kalibr copies the detector via boost serialization, and every geometry needs a
+  BOOST_CLASS_EXPORT. Added `Radtan4DistortedOmni[Rs]CameraGeometry` to aslam_cv_serialization
+  (`CameraBaseSerialization.hpp` keys, `src/autogen/Camera-*.cpp`, `autogen_cameras.cmake`, and the
+  `gen_files.py` list so a regeneration keeps them). Note: FovDistortedOmni is not registered upstream either.

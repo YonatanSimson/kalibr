@@ -33,6 +33,7 @@ add_library(${PROJECT_NAME}
   src/NoMask.cpp
   src/NoDistortion.cpp
   src/RadialTangentialDistortion.cpp
+  src/RadialTangential4Distortion.cpp
   src/EquidistantDistortion.cpp
   src/FovDistortion.cpp
   src/ImageMask.cpp
@@ -63,6 +64,7 @@ if(CATKIN_ENABLE_TESTING)
     test/ExtendedUnifiedCameraGeometry.cpp
     test/DoubleSphereCameraGeometry.cpp
     test/RadialTangentialDistortion.cpp
+    test/RadialTangential4Distortion.cpp
     test/EquidistantDistortion.cpp
     test/FovDistortion.cpp
     test/Triangulation.cpp
