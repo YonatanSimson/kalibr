@@ -10,12 +10,20 @@ namespace cameras {
 
 namespace omni_xi {
 /// KALIBR_OMNI_XI_FIXED=1: keep xi out of the optimisation (see OMNI_FIXED_XI.md).
-inline bool fixed() {
-  static const bool value = [] {
+inline bool& fixedFlag() {
+  static bool value = [] {
     const char* s = std::getenv("KALIBR_OMNI_XI_FIXED");
     return s != nullptr && *s != '\0' && std::strcmp(s, "0") != 0;
   }();
   return value;
+}
+inline bool fixed() {
+  return fixedFlag();
+}
+/// Override KALIBR_OMNI_XI_FIXED for this process (tests). Not thread-safe: set it before
+/// building an optimisation problem, the parameter block size must not change under one.
+inline void setFixed(bool f) {
+  fixedFlag() = f;
 }
 /// KALIBR_OMNI_XI_INIT=<xi0>: the xi initializeIntrinsics seeds (default 1).
 inline double init() {
