@@ -23,15 +23,17 @@ which is what made the MEI parameters meaningful.
 - **Fixed ξ made the difference — for MEI.** Free ξ trades against focal length and the k-terms:
   kalibr drifted to ξ 2.1–2.3 (k1, k2) or 2.5 (k1..k4) at equal fit, with fx moving 10 % and k3/k4
   swinging (k4 up to +83). Fixed at the factory 2.45543 the parameters line up with the factory's.
-- **k1..k4 vs k1, k2 (ξ fixed).** kalibr's own error drops 12–15 % (cam0 ±0.96/0.87 → ±0.82/0.78 px,
-  cam1 ±1.28/1.09 → ±1.12/1.00 px); k1, k2 now match the factory in sign and size (k1, k2-only gave
-  k2 = +0.28 vs factory −0.99); on independent corners cam1's RMSE roughly halves (≈ 6.3 → 3.9 px).
-  k3, k4 are not yet determined (cam1 k3 8.2 / k4 −7.0 vs factory 3.1 / 8.9).
+- **k1..k4 vs k1, k2 (ξ fixed) — not yet established.** k1, k2 now match the factory in sign and size
+  (k1, k2-only gave k2 = +0.28 vs factory −0.99). A first run showed 12–15 % lower kalibr error
+  (cam0 ±0.96/0.87 → ±0.82/0.78 px), but kalibr shuffles the view order every run and a second run
+  reversed cam0 (±0.89 vs ±0.92 px): the gap is within run-to-run noise. Redo with `--no-shuffle`.
+  k3, k4 are not determined either (cam1 k3 8.2 / k4 −7.0 vs factory 3.1 / 8.9; no rim data).
 - **What kalibr needed** (all below): seeding ξ and the distortion (MEI with ξ > 1 cannot lift rim
   pixels otherwise), three wide-FOV fixes (PnP with < 6 points, pose guess dropping rim boards,
   failed pose guesses turning the intrinsics pre-solve NaN), and serialization registration for the
-  new geometry. Patched vs stock: same unit-test results; on a take stock can calibrate, equal or
-  better fit.
+  new geometry. Patched vs stock (GoPro bag, fixed view order): pinhole-equi and EUCM bit-identical,
+  omni-radtan and DS the same fit (differences only from the wide-FOV pose-guess fix); same unit-test
+  results; the new ξ / distortion options are inert when unset.
 - **Open:** the recording has almost no board views past 90° (14 / 19 rim corners vs ≈ 21,600 /
   4,000 inside). A take with the board held at each lens's edge is needed to fix k3, k4 and to rank
   the models at the rim.
@@ -114,7 +116,9 @@ Files deleted since the base are not removed from the image.
        the 4-column Jacobian against finite differences at ξ = 0.5, 1, 2, 2.5, 3 (radtan, radtan4).
 3. [x] Regression: with the variables unset the patch only changes views where stock would have
        thrown. Stock cannot run this take at all, so compare stock vs patched on a take stock can
-       calibrate (or on a frame subset) — results must be identical.
+       calibrate. Run both with `--no-shuffle` — kalibr otherwise randomises the view order every
+       run, and run-to-run differences swamp any code effect. Result: see the status log entry
+       "legacy regression (review build)".
 4. [x] Seed only: `KALIBR_OMNI_XI_INIT=2.45543` — converges; compare with the ξ = 1 seed.
 5. [x] Fixed: `KALIBR_OMNI_XI_INIT=2.45543 KALIBR_OMNI_XI_FIXED=1` — output camchain has
        ξ = 2.45543 exactly; reprojection error close to the free-ξ run.
@@ -197,8 +201,8 @@ Meanwhile the term-by-term comparison is covered outside kalibr by the fixed-ξ 
   DS 0.40/0.38 → 0.36/0.31 (different minimum: ξ −0.28→−0.09, fu 628→796 — DS ξ/α/f are near-degenerate),
   EUCM 0.38/0.36 → 0.37/0.33 (≈ same params, cu +4 px), omni-radtan 0.37/0.32 → 0.39/0.33 (≈ identical:
   ξ 1.228/1.223, fu 1944.8/1945.0). Not bit-identical — fix 2 changes the pose guesses, and kalibr's
-  incremental view selection follows them — but no loss of fit. Outputs:
-  `~/data/calibration/gopro/C3531325057330/1080_30_16x9_wide/regression_omnixi/{stock,patched}/`.
+  incremental view selection follows them — but no loss of fit. (Superseded: these runs were shuffled,
+  see "legacy regression (review build)" below; outputs deleted.)
 - 2026-10-07: stretch goal started — `RadialTangential4Distortion` (header, implementation, src, CMake,
   typedefs `Radtan4DistortedOmni[Rs]CameraGeometry`, factory strings) + gtests written; bindings next.
 - 2026-10-07: radtan4 wired end to end: python bindings (aslam_cv: distortion, projection, geometries,
@@ -222,3 +226,28 @@ Meanwhile the term-by-term comparison is covered outside kalibr by the fixed-ξ 
   ξ = 0.5, 1, 2, 2.5, 3 (Jacobian vs finite difference and vs the free-ξ Jacobian minus its ξ column,
   update() leaves ξ alone). Test points come from lifted pixels: `createRandomKeypoint` divides by
   ξ² − 1 and never returns at ξ = 1.
+- 2026-10-07: **legacy regression (review build).** Image `kalibr_ubuntu2004_omnixi5` (this branch incl.
+  the review fixes) vs stock `kalibr_ubuntu2004`, GoPro 1080/30 wide bag (C3531325057330), no
+  KALIBR_OMNI_* variables, `--no-shuffle --bag-freq 4`, same focal guess (881) on stdin:
+
+  | model | stock | review build | views |
+  |---|---|---|---|
+  | pinhole-equi (GoPro fisheye) | fu 880.1134, cu 958.7368, σ 0.3040/0.3143 | identical to ~1e-13 (rounding) | 38 / 38 |
+  | eucm-none | α 0.54711, β 1.00914, fu 875.3798, σ 0.3111/0.3014 | identical to ~1e-13 | 30 / 30 |
+  | omni-radtan | ξ 1.230676, fu 1947.458, cu 952.5448, σ 0.344054/0.327217 | ξ 1.231326, fu 1948.027, cu 952.5447, σ 0.344054/0.327214 | 42 / 42 |
+  | ds-none | ξ −0.1580, α 0.52892, fu 739.29, σ 0.3017/0.2881 | ξ −0.1549, α 0.52938, fu 741.89, σ 0.3007/0.2881 | 27 / 28 |
+
+  pinhole-equi and EUCM do not see any change (the only shared change, skipping views without a pose
+  guess in `calibrateIntrinsics`, is a no-op when no view fails). omni-radtan lands in the same minimum
+  (same views, same error) with ξ/fu 0.05 % apart — the pose-guess fix gives slightly different start
+  poses and kalibr stops at its 1e-3 step tolerance. DS uses one more view (the pose-guess fix rescues
+  it), same fit; fu moves along DS's ξ–α–f near-degeneracy. Fixed-ξ / init / distortion-seed options are
+  inert when unset. Also on the review build: unit tests 26 pass + the 2 pre-existing GridCalibration
+  failures; both fixed-ξ gtests pass; X6 legacy omni (ξ seed 1, free) converges, ξ 1.82 / 1.93,
+  σ 0.84 / 1.17 px. Outputs: session scratchpad `gopro_regression/{stock,reviewed}/` and
+  `~/data/calibration/insta360/review_rerun/`.
+- 2026-10-07: **kalibr is non-deterministic by default**: `kalibr_calibrate_cameras` shuffles the view order
+  (`random.shuffle`, unseeded) unless `--no-shuffle` is given. Two shuffled X6 runs on the same image
+  differ by up to ~10 px in focal and flip DS between minima. Consequence: the earlier "k1..k4 vs
+  k1, k2: 12–15 % lower error" (shuffled runs) is within run-to-run noise and is not established —
+  redo that comparison with `--no-shuffle`.
