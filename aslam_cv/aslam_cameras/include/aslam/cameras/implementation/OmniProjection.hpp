@@ -455,12 +455,14 @@ void OmniProjection<DISTORTION_T>::euclideanToKeypointIntrinsicsJacobian(
   // With xi fixed the parameter block is [fu fv cu cv]: drop the xi column.
   Eigen::MatrixBase<DERIVED_JI> & Jout =
       const_cast<Eigen::MatrixBase<DERIVED_JI> &>(outJi);
+  // Dynamic-size blocks so this compiles for any output type; the 4-column form needs a
+  // dynamic matrix (what CameraGeometry passes), a fixed 2x5 one keeps a stale last column.
   if (omni_xi::fixed()) {
     Jout.derived().resize(KeypointDimension, 4);
-    Jout = J.template rightCols<4>();
+    Jout.derived().block(0, 0, KeypointDimension, 4) = J.block(0, 1, KeypointDimension, 4);
   } else {
     Jout.derived().resize(KeypointDimension, 5);
-    Jout = J;
+    Jout.derived().block(0, 0, KeypointDimension, 5) = J;
   }
 }
 

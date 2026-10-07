@@ -40,6 +40,10 @@ boost::shared_ptr<CameraGeometryBase> CameraGeometryBase::create(
     rval.reset(
         new CameraGeometry<OmniProjection<RadialTangentialDistortion>,
             GlobalShutter, NoMask>(config));
+  } else if (type == "Radtan4DistortedOmni") {
+    rval.reset(
+        new CameraGeometry<OmniProjection<RadialTangential4Distortion>,
+            GlobalShutter, NoMask>(config));
   } else if (type == "EquidistantDistortedOmni") {
     rval.reset(
         new CameraGeometry<OmniProjection<EquidistantDistortion>, GlobalShutter,
@@ -71,6 +75,10 @@ boost::shared_ptr<CameraGeometryBase> CameraGeometryBase::create(
   } else if (type == "DistortedOmniRs") {
     rval.reset(
         new CameraGeometry<OmniProjection<RadialTangentialDistortion>,
+            RollingShutter, NoMask>(config));
+  } else if (type == "Radtan4DistortedOmniRs") {
+    rval.reset(
+        new CameraGeometry<OmniProjection<RadialTangential4Distortion>,
             RollingShutter, NoMask>(config));
   } else if (type == "EquidistantDistortedOmniRs") {
     rval.reset(
