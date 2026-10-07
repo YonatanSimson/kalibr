@@ -52,7 +52,7 @@ TEST(AslamCamerasTestSuite, testDistortedOmniFixedXi)
 {
   using namespace aslam::cameras;
   if (!omni_xi::fixed()) {
-    return;
+    GTEST_SKIP() << "needs KALIBR_OMNI_XI_FIXED=1";
   }
   RadialTangentialDistortion d(1.17, 0.28, -0.003, 0.003);
   DistortedOmniCameraGeometry geometry = DistortedOmniCameraGeometry::getTestGeometry();

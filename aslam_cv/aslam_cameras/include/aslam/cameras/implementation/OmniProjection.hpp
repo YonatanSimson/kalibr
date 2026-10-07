@@ -456,8 +456,10 @@ void OmniProjection<DISTORTION_T>::euclideanToKeypointIntrinsicsJacobian(
   Eigen::MatrixBase<DERIVED_JI> & Jout =
       const_cast<Eigen::MatrixBase<DERIVED_JI> &>(outJi);
   // Dynamic-size blocks so this compiles for any output type; the 4-column form needs a
-  // dynamic matrix (what CameraGeometry passes), a fixed 2x5 one keeps a stale last column.
+  // dynamic matrix (what CameraGeometry passes), a fixed 2x5 one would keep a stale last column.
   if (omni_xi::fixed()) {
+    SM_ASSERT_TRUE(std::runtime_error, DERIVED_JI::ColsAtCompileTime != 5,
+                   "KALIBR_OMNI_XI_FIXED: the intrinsics Jacobian is 2x4, pass a dynamic matrix");
     Jout.derived().resize(KeypointDimension, 4);
     Jout.derived().block(0, 0, KeypointDimension, 4) = J.block(0, 1, KeypointDimension, 4);
   } else {
@@ -901,6 +903,10 @@ bool OmniProjection<DISTORTION_T>::initializeIntrinsics(const std::vector<GridCa
         D(i) = d0[i];
       }
       _distortion.setParameters(D);
+    } else {
+      // Silently skipping the seed leaves the rim unliftable with xi > 1 (NaN later on).
+      SM_WARN_STREAM("KALIBR_OMNI_DIST_INIT has " << d0.size() << " values but this distortion model has "
+                     << D.size() << " parameters; distortion seed ignored.");
     }
   }
   updateTemporaries();
