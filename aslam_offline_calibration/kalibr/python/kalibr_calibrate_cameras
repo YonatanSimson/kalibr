@@ -98,6 +98,9 @@ def parseArgs():
     groupCalibrator.add_argument('--qr-tol', type=float, default=0.02, dest='qrTol', help='The tolerance on the factors of the QR decomposition (default: %(default)s)')
     groupCalibrator.add_argument('--mi-tol', type=float, default=0.2, dest='miTol', help='The tolerance on the mutual information for adding an image. Higher means fewer images will be added. Use -1 to force all images. (default: %(default)s)')
     groupCalibrator.add_argument('--no-shuffle', action='store_true', dest='noShuffle', help='Do not shuffle the dataset processing order')
+    groupCalibrator.add_argument('--shuffle-seed', type=int, default=None, dest='shuffleSeed',
+                                 help='Seed the view-order shuffle so runs are repeatable (time order, --no-shuffle, '
+                                      'can start the incremental solve on uninformative views, e.g. rim-only fisheye views)')
     
     outlierSettings = parser.add_argument_group('Outlier filtering options')
     outlierSettings.add_argument('--no-outliers-removal', action='store_false', default=True, dest='removeOutliers', help='Disable corner outlier filtering')
@@ -260,7 +263,10 @@ def main():
             #shuffle the views
             timestamps = obsdb.getAllViewTimestamps()
             if not parsed.noShuffle:
-                random.shuffle(timestamps)
+                if parsed.shuffleSeed is not None:
+                    random.Random(parsed.shuffleSeed).shuffle(timestamps)
+                else:
+                    random.shuffle(timestamps)
 
             #process all target views
             print("starting calibration...")
