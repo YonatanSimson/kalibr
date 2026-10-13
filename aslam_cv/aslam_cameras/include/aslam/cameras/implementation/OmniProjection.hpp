@@ -10,12 +10,20 @@ namespace cameras {
 
 namespace omni_xi {
 /// KALIBR_OMNI_XI_FIXED=1: keep xi out of the optimisation (see OMNI_FIXED_XI.md).
-inline bool fixed() {
-  static const bool value = [] {
+inline bool& fixedFlag() {
+  static bool value = [] {
     const char* s = std::getenv("KALIBR_OMNI_XI_FIXED");
     return s != nullptr && *s != '\0' && std::strcmp(s, "0") != 0;
   }();
   return value;
+}
+inline bool fixed() {
+  return fixedFlag();
+}
+/// Override KALIBR_OMNI_XI_FIXED for this process (tests). Not thread-safe: set it before
+/// building an optimisation problem, the parameter block size must not change under one.
+inline void setFixed(bool f) {
+  fixedFlag() = f;
 }
 /// KALIBR_OMNI_XI_INIT=<xi0>: the xi initializeIntrinsics seeds (default 1).
 inline double init() {
@@ -455,12 +463,16 @@ void OmniProjection<DISTORTION_T>::euclideanToKeypointIntrinsicsJacobian(
   // With xi fixed the parameter block is [fu fv cu cv]: drop the xi column.
   Eigen::MatrixBase<DERIVED_JI> & Jout =
       const_cast<Eigen::MatrixBase<DERIVED_JI> &>(outJi);
+  // Dynamic-size blocks so this compiles for any output type; the 4-column form needs a
+  // dynamic matrix (what CameraGeometry passes), a fixed 2x5 one would keep a stale last column.
   if (omni_xi::fixed()) {
+    SM_ASSERT_TRUE(std::runtime_error, DERIVED_JI::ColsAtCompileTime != 5,
+                   "KALIBR_OMNI_XI_FIXED: the intrinsics Jacobian is 2x4, pass a dynamic matrix");
     Jout.derived().resize(KeypointDimension, 4);
-    Jout = J.template rightCols<4>();
+    Jout.derived().block(0, 0, KeypointDimension, 4) = J.block(0, 1, KeypointDimension, 4);
   } else {
     Jout.derived().resize(KeypointDimension, 5);
-    Jout = J;
+    Jout.derived().block(0, 0, KeypointDimension, 5) = J;
   }
 }
 
@@ -899,6 +911,10 @@ bool OmniProjection<DISTORTION_T>::initializeIntrinsics(const std::vector<GridCa
         D(i) = d0[i];
       }
       _distortion.setParameters(D);
+    } else {
+      // Silently skipping the seed leaves the rim unliftable with xi > 1 (NaN later on).
+      SM_WARN_STREAM("KALIBR_OMNI_DIST_INIT has " << d0.size() << " values but this distortion model has "
+                     << D.size() << " parameters; distortion seed ignored.");
     }
   }
   updateTemporaries();

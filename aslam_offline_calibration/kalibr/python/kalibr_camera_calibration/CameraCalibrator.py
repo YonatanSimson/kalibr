@@ -60,7 +60,7 @@ class CameraGeometry(object):
         
         #in case of an omni model, first optimize over intrinsics only
         #(--> catch most of the distortion with the projection model)
-        if self.model == acvb.DistortedOmni:
+        if self.model in (acvb.DistortedOmni, acvb.Radtan4DistortedOmni):
             success = kcc.calibrateIntrinsics(self, observations, distortionActive=False)
             if not success:
                 sm.logError("initialization of intrinsics for cam with topic {0} failed  ".format(self.dataset.topic))

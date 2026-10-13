@@ -45,6 +45,17 @@ class DistortedOmniRs(CameraModel):
     shutterType = aslam_cv.RollingShutter
     frameType = aslam_cv.DistortedOmniRsFrame
 
+class Radtan4DistortedOmni(CameraModel):
+    """MEI + k1..k4, p1, p2 (Insta360 factory form). See kalibr OMNI_FIXED_XI.md."""
+    geometry = aslam_cv.Radtan4DistortedOmniCameraGeometry
+    reprojectionError = Radtan4DistortedOmniReprojectionError
+    reprojectionErrorSimple = Radtan4DistortedOmniReprojectionErrorSimple
+    designVariable = Radtan4DistortedOmniCameraGeometryDesignVariable
+    projectionType = aslam_cv.Radtan4DistortedOmniProjection
+    distortionType = aslam_cv.RadialTangential4Distortion
+    shutterType = aslam_cv.GlobalShutter
+    frameType = aslam_cv.Radtan4DistortedOmniFrame
+
 class DistortedPinhole(CameraModel):
     geometry = aslam_cv.DistortedPinholeCameraGeometry
     reprojectionError = DistortedPinholeReprojectionError

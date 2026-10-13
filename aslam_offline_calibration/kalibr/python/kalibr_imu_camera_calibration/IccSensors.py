@@ -1,5 +1,6 @@
 from __future__ import print_function #handle print in 2.x python
 import sm
+import os
 import aslam_cv as acv
 import aslam_cameras_april as acv_april
 import aslam_splines as asp
@@ -274,13 +275,22 @@ class IccCamera():
         print(self.timeshiftCamToImuPrior)
         
     #initialize a pose spline using camera poses (pose spline = T_wb)
+    #(time [s], T_t_c 4x4) of the target poses that seed the pose spline: this camera's own observations,
+    #or initPoseOverride (set by IccCameraChain with KALIBR_IMU_INIT_ALL_CAMS=1: every lens of the chain)
+    def initTargetPoses(self):
+        override = getattr(self, "initPoseOverride", None)
+        if override is not None:
+            return override
+        return [(obs.time().toSec(), obs.T_t_c().T()) for obs in self.targetObservations]
+
     def initPoseSplineFromCamera(self, splineOrder=6, poseKnotsPerSecond=100, timeOffsetPadding=0.02):
         T_c_b = self.T_extrinsic.T()        
         pose = bsplines.BSplinePose(splineOrder, sm.RotationVector() )
                 
         # Get the checkerboard times.
-        times = np.array([obs.time().toSec()+self.timeshiftCamToImuPrior for obs in self.targetObservations ])                 
-        curve = np.matrix([ pose.transformationToCurveValue( np.dot(obs.T_t_c().T(), T_c_b) ) for obs in self.targetObservations]).T
+        poses = self.initTargetPoses()
+        times = np.array([t+self.timeshiftCamToImuPrior for t, _ in poses ])                 
+        curve = np.matrix([ pose.transformationToCurveValue( np.dot(T_t_c, T_c_b) ) for _, T_t_c in poses]).T
         
         if np.isnan(curve).any():
             raise RuntimeError("Nans in curve values")
@@ -449,6 +459,29 @@ class IccCameraChain():
             print("Baseline between cam{0} and cam{1} set to:".format(camNr-1,camNr))
             print("T= ", self.camList[camNr].T_extrinsic.T())
             print("Baseline: ", np.linalg.norm(self.camList[camNr].T_extrinsic.t()), " [m]")
+        if os.environ.get("KALIBR_IMU_INIT_ALL_CAMS") == "1" and len(self.camList) > 1:
+            self.seedCam0FromAllCams()
+
+    #Seed the pose spline, time-shift and orientation priors (all built on cam0's target poses) from every
+    #lens: a camN view becomes a cam0 pose through the chain prior, T_t_c0 = T_t_cN * T_cN_c0. For lenses
+    #facing opposite ways (Insta360), cam0 alone leaves the spline unconstrained wherever only another
+    #lens sees the target. Where cam0 has its own view (within 1 ms) that one is kept.
+    def seedCam0FromAllCams(self):
+        poses = {int(round(obs.time().toSec() * 1e3)): (obs.time().toSec(), obs.T_t_c().T())
+                 for obs in self.camList[0].targetObservations}
+        T_cN_c0 = np.eye(4)
+        for camNr in range(1, len(self.camList)):
+            cam = self.camList[camNr]
+            T_cN_c0 = np.dot(cam.T_extrinsic.T(), T_cN_c0)
+            added = 0
+            for obs in cam.targetObservations:
+                key = int(round(obs.time().toSec() * 1e3))
+                if key not in poses:
+                    poses[key] = (obs.time().toSec(), np.dot(obs.T_t_c().T(), T_cN_c0))
+                    added += 1
+            print("Pose-spline seed: {0} views of cam{1} mapped into cam0 (cam0 has {2})".format(
+                added, camNr, len(self.camList[0].targetObservations)))
+        self.camList[0].initPoseOverride = [poses[k] for k in sorted(poses)]
    
     #initialize a pose spline for the chain
     def initializePoseSplineFromCameraChain(self, splineOrder=6, poseKnotsPerSecond=100, timeOffsetPadding=0.02):

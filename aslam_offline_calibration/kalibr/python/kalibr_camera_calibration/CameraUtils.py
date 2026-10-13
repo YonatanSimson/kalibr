@@ -330,6 +330,7 @@ def saveChainParametersYaml(cself, resultFile, graph):
                     acvb.FovPinhole: 'pinhole',
                     acvb.Omni: 'omni',
                     acvb.DistortedOmni: 'omni',
+                    acvb.Radtan4DistortedOmni: 'omni',
                     acvb.ExtendedUnified: 'eucm',
                     acvb.DoubleSphere: 'ds'}
     distortionModels = {acvb.DistortedPinhole: 'radtan',
@@ -337,6 +338,7 @@ def saveChainParametersYaml(cself, resultFile, graph):
                         acvb.FovPinhole: 'fov',
                         acvb.Omni: 'none',
                         acvb.DistortedOmni: 'radtan',
+                        acvb.Radtan4DistortedOmni: 'radtan4',
                         acvb.ExtendedUnified: 'none',
                         acvb.DoubleSphere: 'none'}
 
