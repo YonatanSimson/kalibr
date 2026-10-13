@@ -10,7 +10,7 @@ CTX="$(mktemp -d)"
 trap 'rm -rf "$CTX"' EXIT
 # Source files only: anything under a package directory, changed or new since BASE.
 { git diff --name-only "$BASE" --; git ls-files --others --exclude-standard; } \
-    | grep '/' | sort -u | while read -r f; do [[ -f "$f" ]] && echo "$f"; done > "$CTX/files.txt"
+    | grep '/' | sort -u | while read -r f; do if [[ -f "$f" ]]; then echo "$f"; fi; done > "$CTX/files.txt"
 echo "layering $(wc -l < "$CTX/files.txt" | tr -d ' ') changed files on kalibr_ubuntu2004:"
 sed 's/^/  /' "$CTX/files.txt"
 tar cf "$CTX/changed.tar" -T "$CTX/files.txt"

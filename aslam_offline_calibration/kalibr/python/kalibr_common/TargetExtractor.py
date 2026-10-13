@@ -14,6 +14,7 @@ import json
 import os
 import re
 import aslam_cv as acv
+from .CornerFrames import selectCameraFrames
 
 def multicoreExtractionWrapper(detector, taskq, resultq, clearImages, noTransformation):    
     while 1:
@@ -47,9 +48,9 @@ def importCornersFromJson(path, dataset, detector, clearImages=True, noTransform
 
     Several files ("a.json:b.json", e.g. two recordings of the same camera and mode, pooled for
     intrinsics): observations are built from the JSON frames alone -- the bag only provides the image
-    size -- so no combined bag is needed. KALIBR_CORNERS_EVERY=N keeps every Nth frame per file (the
-    bag's --bag-freq does not apply in this mode). Images are not kept (kalibr's corner plots skip
-    them).
+    size -- so no combined bag is needed. KALIBR_CORNERS_EVERY=N keeps every Nth timestamp per file,
+    the same timestamps for all cameras (the bag's --bag-freq does not apply in this mode). Images are
+    not kept (kalibr's corner plots skip them).
     """
     paths = path.split(":")
     if len(paths) > 1:
@@ -89,9 +90,9 @@ def importCornersFromJson(path, dataset, detector, clearImages=True, noTransform
     print("  imported {0} observations".format(len(observations)))
     return observations
 
-def _corner_frames(path, cam_id):
+def _corner_frames(path, cam_id, every):
     with open(path) as f:
-        return [fr for fr in json.load(f) if fr["cam_id"] == cam_id]
+        return selectCameraFrames(json.load(f), cam_id, every)
 
 def _observation_from_frame(fr, target, blank, timestamp, detector, noTransformation):
     cols = target.cols()          # corner-grid columns = 2 * tag columns
@@ -124,7 +125,7 @@ def importCornersFromJsonOnly(paths, dataset, detector, noTransformation=False):
     min_corners = 4 * 4
     observations = []
     for path in paths:
-        frames = sorted(_corner_frames(path, cam_id), key=lambda fr: fr["frame_id"])[::every]
+        frames = _corner_frames(path, cam_id, every)
         n0 = len(observations)
         for fr in frames:
             if len(fr["corner_ids"]) < min_corners:
