@@ -43,7 +43,7 @@ TEST(AslamCamerasTestSuite, testDistortedOmniCameraGeometry)
 
 }
 
-// KALIBR_OMNI_XI_FIXED (OMNI_FIXED_XI.md): xi leaves the parameter block, which becomes
+// KALIBR_OMNI_XI_FIXED (OMNI_PATCH.md): xi leaves the parameter block, which becomes
 // [fu fv cu cv]. Checked at several xi on both sides of 1 (the MEI liftable region changes there).
 namespace {
 
@@ -132,5 +132,13 @@ TEST(AslamCamerasTestSuite, testRadtan4DistortedOmniFixedXi)
   using namespace aslam::cameras;
   Radtan4DistortedOmniCameraGeometry geometry = Radtan4DistortedOmniCameraGeometry::getTestGeometry();
   geometry.projection().setDistortion(RadialTangential4Distortion::getTestDistortion());
+  checkFixedXi(geometry);
+}
+
+TEST(AslamCamerasTestSuite, testRadtanProDistortedOmniFixedXi)
+{
+  using namespace aslam::cameras;
+  RadtanProDistortedOmniCameraGeometry geometry = RadtanProDistortedOmniCameraGeometry::getTestGeometry();
+  geometry.projection().setDistortion(RadialTangentialProDistortion::getTestDistortion());
   checkFixedXi(geometry);
 }

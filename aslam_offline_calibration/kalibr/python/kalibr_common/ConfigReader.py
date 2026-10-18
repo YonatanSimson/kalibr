@@ -107,6 +107,20 @@ class AslamCamera(object):
                 self.reprojectionErrorType = cvb.Radtan4DistortedOmniReprojectionErrorSimple
                 # no undistorterType: OmniUndistorter is built for RadialTangentialDistortion only
 
+            elif dist_model == 'radtanpro':
+                # MEI + Insta360's 13-term offset_v6 distortion; coeffs d0..d12 in the vendor's order.
+                dist = cv.RadialTangentialProDistortion()
+                dist.setParameters(np.array(dist_coeff[0:13], dtype=float).reshape(13, 1))
+                proj = cv.RadtanProDistortedOmniProjection(xi_omni, focalLength[0], focalLength[1],
+                                                           principalPoint[0], principalPoint[1],
+                                                           resolution[0], resolution[1],
+                                                           dist)
+                self.geometry = cv.RadtanProDistortedOmniCameraGeometry(proj)
+                self.frameType = cv.RadtanProDistortedOmniFrame
+                self.keypointType = cv.Keypoint2
+                self.reprojectionErrorType = cvb.RadtanProDistortedOmniReprojectionErrorSimple
+                # no undistorterType, as radtan4
+
             elif dist_model == 'equidistant':
                 
                 raise RuntimeError("Omni with equidistant model not yet supported!")
@@ -352,6 +366,7 @@ class CameraParameters(ParametersBase):
     def checkDistortion(self, model, coeffs):
         distortionModelsAndNumParams = {'radtan': 4,
                                         'radtan4': 6,
+                                        'radtanpro': 13,
                                         'equidistant': 4, 
                                         'fov': 1, 
                                         'none': 0}

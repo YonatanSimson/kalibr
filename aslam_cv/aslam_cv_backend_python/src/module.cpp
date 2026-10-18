@@ -8,6 +8,7 @@
 #include <aslam/cameras/NoDistortion.hpp>
 #include <aslam/cameras/RadialTangentialDistortion.hpp>
 #include <aslam/cameras/RadialTangential4Distortion.hpp>
+#include <aslam/cameras/RadialTangentialProDistortion.hpp>
 #include <aslam/cameras/EquidistantDistortion.hpp>
 #include <aslam/cameras.hpp>
 #include <aslam/cameras/GlobalShutter.hpp>
@@ -60,8 +61,11 @@ BOOST_PYTHON_MODULE(libaslam_cv_backend_python)
   aslam::python::exportCovarianceReprojectionError<FovDistortedOmniRsCameraGeometry>("FovDistortedOmniRs");
 
   aslam::python::exportReprojectionErrors<Radtan4DistortedOmniCameraGeometry>("Radtan4DistortedOmni");
+  aslam::python::exportReprojectionErrors<RadtanProDistortedOmniCameraGeometry>("RadtanProDistortedOmni");
   aslam::python::exportReprojectionErrors<Radtan4DistortedOmniRsCameraGeometry>("Radtan4DistortedOmniRs");
+  aslam::python::exportReprojectionErrors<RadtanProDistortedOmniRsCameraGeometry>("RadtanProDistortedOmniRs");
   aslam::python::exportCovarianceReprojectionError<Radtan4DistortedOmniRsCameraGeometry>("Radtan4DistortedOmniRs");
+  aslam::python::exportCovarianceReprojectionError<RadtanProDistortedOmniRsCameraGeometry>("RadtanProDistortedOmniRs");
 
 
   // Export the camera design variables:
@@ -82,6 +86,7 @@ BOOST_PYTHON_MODULE(libaslam_cv_backend_python)
   exportCameraDesignVariables<EquidistantDistortedOmniRsCameraGeometry>("EquidistantDistortedOmniRsCameraGeometry");
   exportCameraDesignVariables<FovDistortedOmniRsCameraGeometry>("FovDistortedOmniRsCameraGeometry");
   exportCameraDesignVariables<Radtan4DistortedOmniRsCameraGeometry>("Radtan4DistortedOmniRsCameraGeometry");
+  exportCameraDesignVariables<RadtanProDistortedOmniRsCameraGeometry>("RadtanProDistortedOmniRsCameraGeometry");
 
   exportCameraDesignVariables<ExtendedUnifiedCameraGeometry>("ExtendedUnifiedCameraGeometry");
   exportCameraDesignVariables<DoubleSphereCameraGeometry>("DoubleSphereCameraGeometry");
@@ -91,6 +96,7 @@ BOOST_PYTHON_MODULE(libaslam_cv_backend_python)
   exportCameraDesignVariables<EquidistantDistortedOmniCameraGeometry>("EquidistantDistortedOmniCameraGeometry");
   exportCameraDesignVariables<FovDistortedOmniCameraGeometry>("FovDistortedOmniCameraGeometry");
   exportCameraDesignVariables<Radtan4DistortedOmniCameraGeometry>("Radtan4DistortedOmniCameraGeometry");
+  exportCameraDesignVariables<RadtanProDistortedOmniCameraGeometry>("RadtanProDistortedOmniCameraGeometry");
 
   exportCameraDesignVariables<MaskedPinholeCameraGeometry>("MaskedPinholeCameraGeometry");
   exportCameraDesignVariables<MaskedDistortedPinholeCameraGeometry>("MaskedDistortedPinholeCameraGeometry");
@@ -123,6 +129,7 @@ BOOST_PYTHON_MODULE(libaslam_cv_backend_python)
   exportGenericProjectionDesignVariable<EquidistantDistortion>("EquidistantDistortion");
   exportGenericProjectionDesignVariable<FovDistortion>("FovDistortion");
   exportGenericProjectionDesignVariable<RadialTangential4Distortion>("RadialTangential4Distortion");
+  exportGenericProjectionDesignVariable<RadialTangentialProDistortion>("RadialTangentialProDistortion");
 
   exportGenericProjectionDesignVariable< PinholeProjection<NoDistortion> >("PinholeProjection");
   exportGenericProjectionDesignVariable< PinholeProjection<RadialTangentialDistortion> >("DistortedPinholeProjection");
@@ -137,6 +144,7 @@ BOOST_PYTHON_MODULE(libaslam_cv_backend_python)
   exportGenericProjectionDesignVariable< OmniProjection<EquidistantDistortion> >("EquidistantDistortedOmniProjection");
   exportGenericProjectionDesignVariable< OmniProjection<FovDistortion> >("FovDistortedOmniProjection");
   exportGenericProjectionDesignVariable< OmniProjection<RadialTangential4Distortion> >("Radtan4DistortedOmniProjection");
+  exportGenericProjectionDesignVariable< OmniProjection<RadialTangentialProDistortion> >("RadtanProDistortedOmniProjection");
 
   // Export Shutter Design Variables:
   exportShutterDesignVariable< GlobalShutter >("GlobalShutter");

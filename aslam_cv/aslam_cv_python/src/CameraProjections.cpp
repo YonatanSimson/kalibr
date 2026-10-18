@@ -8,6 +8,7 @@
 #include <aslam/cameras/FovDistortion.hpp>
 #include <aslam/cameras/RadialTangentialDistortion.hpp>
 #include <aslam/cameras/RadialTangential4Distortion.hpp>
+#include <aslam/cameras/RadialTangentialProDistortion.hpp>
 #include <boost/serialization/nvp.hpp>
 #include <sm/python/boost_serialization_pickle.hpp>
 #include <sm/python/unique_register_ptr_to_python.hpp>
@@ -244,6 +245,18 @@ void exportRadialTangential4DistortionFunctions() {
   distortion.def("k4", &RadialTangential4Distortion::k4);
 }
 
+void exportRadialTangentialProDistortionFunctions() {
+  // 13 coefficients: build with the default constructor, then setParameters(d0..d12).
+  class_<RadialTangentialProDistortion, boost::shared_ptr<RadialTangentialProDistortion> > distortion(
+      "RadialTangentialProDistortion", init<>());
+  sm::python::unique_register_ptr_to_python<boost::shared_ptr<RadialTangentialProDistortion> >();
+
+  exportGenericDistortionFunctions<RadialTangentialProDistortion>(distortion);
+  distortion.def("d", &RadialTangentialProDistortion::d, "Coefficient d_i (vendor order)");
+  distortion.def("minimalDimensions", &RadialTangentialProDistortion::minimalDimensions,
+                 "13 minus the coefficients held fixed (KALIBR_RADTANPRO_FIXED)");
+}
+
 void exportRadialTangentialDistortionFunctions() {
 
   class_<RadialTangentialDistortion,
@@ -464,6 +477,7 @@ void exportCameraProjections() {
 
   exportRadialTangentialDistortionFunctions();
   exportRadialTangential4DistortionFunctions();
+  exportRadialTangentialProDistortionFunctions();
   exportFovDistortionFunctions();
 
   exportPinholeProjection<NoDistortion>("PinholeProjection");
@@ -478,6 +492,7 @@ void exportCameraProjections() {
   exportOmniProjection<RadialTangentialDistortion>("DistortedOmniProjection");
   exportOmniProjection<FovDistortion>("FovOmniProjection");
   exportOmniProjection<RadialTangential4Distortion>("Radtan4DistortedOmniProjection");
+  exportOmniProjection<RadialTangentialProDistortion>("RadtanProDistortedOmniProjection");
 
   exportExtendedUnifiedProjection<NoDistortion>("ExtendedUnifiedProjection");
 

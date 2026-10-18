@@ -331,6 +331,7 @@ def saveChainParametersYaml(cself, resultFile, graph):
                     acvb.Omni: 'omni',
                     acvb.DistortedOmni: 'omni',
                     acvb.Radtan4DistortedOmni: 'omni',
+                    acvb.RadtanProDistortedOmni: 'omni',
                     acvb.ExtendedUnified: 'eucm',
                     acvb.DoubleSphere: 'ds'}
     distortionModels = {acvb.DistortedPinhole: 'radtan',
@@ -339,6 +340,7 @@ def saveChainParametersYaml(cself, resultFile, graph):
                         acvb.Omni: 'none',
                         acvb.DistortedOmni: 'radtan',
                         acvb.Radtan4DistortedOmni: 'radtan4',
+                        acvb.RadtanProDistortedOmni: 'radtanpro',
                         acvb.ExtendedUnified: 'none',
                         acvb.DoubleSphere: 'none'}
 
@@ -654,8 +656,10 @@ def printParameters(cself, dest=sys.stdout):
     for cidx, cam in enumerate(cself.cameras):
         d = cam.geometry.projection().distortion().getParameters().flatten()
         p = cam.geometry.projection().getParameters().flatten()
-        dd = std_cameras[cidx][0:d.shape[0]]
-        dp = std_cameras[cidx][d.shape[0]:]
+        # stds cover the free parameters only (fixed xi / radtanpro terms are not estimated)
+        nd = cam.geometry.minimalDimensionsDistortion()
+        dd = std_cameras[cidx][0:nd]
+        dp = std_cameras[cidx][nd:]
         print("cam{0} ({1}):".format(cidx, cam.dataset.topic), file=dest) 
         print("    type: %s" % ( type(cam.geometry) ), file=dest) 
         print("    distortion: %s +- %s" % (d, np.array(dd)), file=dest)

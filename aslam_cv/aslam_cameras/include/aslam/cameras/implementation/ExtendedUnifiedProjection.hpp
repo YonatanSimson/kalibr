@@ -804,7 +804,7 @@ bool ExtendedUnifiedProjection<DISTORTION_T>::estimateTransformation(
   // a virtual camera. Stock kalibr kept only rays within 80 deg of the optical axis, which
   // drops boards seen near the rim of a > 180 deg lens (every view of the Insta360 X6 rear
   // lens failed its pose guess). Instead the virtual camera looks along the mean ray: R_v
-  // rotates the mean onto +z and rays within 80 deg of it are kept. See OMNI_FIXED_XI.md.
+  // rotates the mean onto +z and rays within 80 deg of it are kept. See OMNI_PATCH.md.
   std::vector<Eigen::Vector3d> rays;
   std::vector<cv::Point3f> targets;
   Eigen::Vector3d meanRay = Eigen::Vector3d::Zero();
@@ -840,7 +840,7 @@ bool ExtendedUnifiedProjection<DISTORTION_T>::estimateTransformation(
   cv::Mat tvec(3, 1, CV_64F);
 
   // OpenCV >= 4 needs 6 points on this path (it throws, which aborted the whole
-  // initialisation instead of skipping one view). See OMNI_FIXED_XI.md.
+  // initialisation instead of skipping one view). See OMNI_PATCH.md.
   if (Ps.size() < 6) {
     return false;
   }

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Test matrix for the configurable / fixed omni xi patch (OMNI_FIXED_XI.md).
+# Test matrix for the configurable / fixed omni xi patch (OMNI_PATCH.md).
 #
 #   ./test_omni_xi.sh <bag dir> <aprilgrid.yaml> [cam0|cam1] [case ...]
 #

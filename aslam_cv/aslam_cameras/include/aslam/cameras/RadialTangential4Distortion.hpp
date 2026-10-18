@@ -26,7 +26,7 @@ namespace cameras {
  * This is the lens model Insta360 cameras store per unit (MEI projection + k1..k4, p1, p2), so
  * an `omni-radtan4` calibration compares term by term with the factory record. Parameter order
  * is [k1 k2 p1 p2 k3 k4]: the first four are RadialTangentialDistortion's, so a radtan result
- * seeds this model unchanged. See OMNI_FIXED_XI.md.
+ * seeds this model unchanged. See OMNI_PATCH.md.
  */
 class RadialTangential4Distortion {
  public:

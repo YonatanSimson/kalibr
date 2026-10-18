@@ -46,7 +46,7 @@ class DistortedOmniRs(CameraModel):
     frameType = aslam_cv.DistortedOmniRsFrame
 
 class Radtan4DistortedOmni(CameraModel):
-    """MEI + k1..k4, p1, p2 (Insta360 factory form). See kalibr OMNI_FIXED_XI.md."""
+    """MEI + k1..k4, p1, p2 (Insta360 factory form). See kalibr OMNI_PATCH.md."""
     geometry = aslam_cv.Radtan4DistortedOmniCameraGeometry
     reprojectionError = Radtan4DistortedOmniReprojectionError
     reprojectionErrorSimple = Radtan4DistortedOmniReprojectionErrorSimple
@@ -55,6 +55,17 @@ class Radtan4DistortedOmni(CameraModel):
     distortionType = aslam_cv.RadialTangential4Distortion
     shutterType = aslam_cv.GlobalShutter
     frameType = aslam_cv.Radtan4DistortedOmniFrame
+
+class RadtanProDistortedOmni(CameraModel):
+    """MEI + Insta360's 13-term offset_v6 distortion, d0..d12. See kalibr OMNI_PATCH.md."""
+    geometry = aslam_cv.RadtanProDistortedOmniCameraGeometry
+    reprojectionError = RadtanProDistortedOmniReprojectionError
+    reprojectionErrorSimple = RadtanProDistortedOmniReprojectionErrorSimple
+    designVariable = RadtanProDistortedOmniCameraGeometryDesignVariable
+    projectionType = aslam_cv.RadtanProDistortedOmniProjection
+    distortionType = aslam_cv.RadialTangentialProDistortion
+    shutterType = aslam_cv.GlobalShutter
+    frameType = aslam_cv.RadtanProDistortedOmniFrame
 
 class DistortedPinhole(CameraModel):
     geometry = aslam_cv.DistortedPinholeCameraGeometry

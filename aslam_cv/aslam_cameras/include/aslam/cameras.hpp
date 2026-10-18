@@ -15,6 +15,7 @@
 #include <aslam/cameras/NoDistortion.hpp>
 #include <aslam/cameras/RadialTangentialDistortion.hpp>
 #include <aslam/cameras/RadialTangential4Distortion.hpp>
+#include <aslam/cameras/RadialTangentialProDistortion.hpp>
 #include <aslam/cameras/EquidistantDistortion.hpp>
 #include <aslam/cameras/FovDistortion.hpp>
 
@@ -67,6 +68,10 @@ typedef CameraGeometry<OmniProjection<FovDistortion>, RollingShutter,
     NoMask> FovDistortedOmniRsCameraGeometry;
 typedef CameraGeometry<OmniProjection<RadialTangential4Distortion>,
     RollingShutter, NoMask> Radtan4DistortedOmniRsCameraGeometry;
+typedef CameraGeometry<OmniProjection<RadialTangentialProDistortion>,
+    GlobalShutter, NoMask> RadtanProDistortedOmniCameraGeometry;
+typedef CameraGeometry<OmniProjection<RadialTangentialProDistortion>,
+    RollingShutter, NoMask> RadtanProDistortedOmniRsCameraGeometry;
 
 typedef CameraGeometry<PinholeProjection<NoDistortion>, GlobalShutter, ImageMask> MaskedPinholeCameraGeometry;
 typedef CameraGeometry<PinholeProjection<RadialTangentialDistortion>,

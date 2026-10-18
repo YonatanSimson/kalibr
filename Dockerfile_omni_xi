@@ -1,7 +1,17 @@
-# kalibr with this checkout's changes (OMNI_FIXED_XI.md), layered on the arm64 image built by
-# exovision-research/gopro_navigation/run_gopro_kalibr.sh --preflight. Build with
-# ./build_omni_xi_image.sh, which packs every source file changed since the upstream base commit
-# into changed.tar; catkin then rebuilds only what those files touch (CMakeLists changes re-run cmake).
+# kalibr with this checkout's changes (OMNI_PATCH.md), layered on kalibr_ubuntu2004: the arm64
+# image built by exovision-research/gopro_navigation/run_gopro_kalibr.sh --preflight, or on amd64
+# upstream's Dockerfile_ros1_20_04. Build with ./build_omni_xi_image.sh, which packs every source
+# file changed since the upstream base commit into changed.tar; catkin then rebuilds only what those
+# files touch (CMakeLists changes re-run cmake).
 FROM kalibr_ubuntu2004
+# What the arm64 preflight image already does, so both bases behave alike: the runners wrap kalibr
+# in xvfb-run, and upstream's shell-form ENTRYPOINT ignores the command `docker run IMAGE cmd`
+# passes (so every runner call silently ran nothing). Same environment, without the entrypoint.
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y xvfb xauth \
+    && rm -rf /var/lib/apt/lists/*
+ENV KALIBR_MANUAL_FOCAL_LENGTH_INIT=1
+WORKDIR /catkin_ws
+ENTRYPOINT []
+CMD ["/bin/bash"]
 ADD changed.tar /catkin_ws/src/kalibr/
 RUN cd /catkin_ws && catkin build -j4 --no-status

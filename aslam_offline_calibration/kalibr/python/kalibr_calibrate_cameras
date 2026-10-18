@@ -37,6 +37,7 @@ cameraModels = { 'pinhole-radtan': acvb.DistortedPinhole,
                  'omni-none':      acvb.Omni,
                  'omni-radtan':    acvb.DistortedOmni,
                  'omni-radtan4':   acvb.Radtan4DistortedOmni,
+                 'omni-radtanpro': acvb.RadtanProDistortedOmni,
                  'eucm-none':      acvb.ExtendedUnified,
                  'ds-none':        acvb.DoubleSphere}
 

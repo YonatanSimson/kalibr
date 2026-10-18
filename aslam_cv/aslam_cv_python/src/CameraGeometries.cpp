@@ -115,6 +115,8 @@ void exportCameraGeometries() {
       "FovDistortedOmniRsCameraGeometry");
   exportCameraGeometry<Radtan4DistortedOmniRsCameraGeometry>(
       "Radtan4DistortedOmniRsCameraGeometry");
+  exportCameraGeometry<RadtanProDistortedOmniRsCameraGeometry>(
+      "RadtanProDistortedOmniRsCameraGeometry");
 
   exportCameraGeometry<ExtendedUnifiedCameraGeometry>("ExtendedUnifiedCameraGeometry");
 
@@ -129,6 +131,8 @@ void exportCameraGeometries() {
       "FovDistortedOmniCameraGeometry");
   exportCameraGeometry<Radtan4DistortedOmniCameraGeometry>(
       "Radtan4DistortedOmniCameraGeometry");
+  exportCameraGeometry<RadtanProDistortedOmniCameraGeometry>(
+      "RadtanProDistortedOmniCameraGeometry");
 
   exportCameraGeometry<MaskedPinholeCameraGeometry>(
       "MaskedPinholeCameraGeometry");

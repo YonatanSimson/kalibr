@@ -7,6 +7,7 @@ SET( AUTOGEN_FRAME_CPP_FILES
 	src/autogen/Frame-OmniCameraGeometry.cpp
 	src/autogen/Frame-DistortedOmniCameraGeometry.cpp
 	src/autogen/Frame-Radtan4DistortedOmniCameraGeometry.cpp
+	src/autogen/Frame-RadtanProDistortedOmniCameraGeometry.cpp
 	src/autogen/Frame-EquidistantDistortedOmniCameraGeometry.cpp
 	src/autogen/Frame-ExtendedUnifiedCameraGeometry.cpp
 	src/autogen/Frame-DoubleSphereCameraGeometry.cpp
@@ -16,6 +17,7 @@ SET( AUTOGEN_FRAME_CPP_FILES
 	src/autogen/Frame-OmniRsCameraGeometry.cpp
 	src/autogen/Frame-DistortedOmniRsCameraGeometry.cpp
 	src/autogen/Frame-Radtan4DistortedOmniRsCameraGeometry.cpp
+	src/autogen/Frame-RadtanProDistortedOmniRsCameraGeometry.cpp
 	src/autogen/Frame-EquidistantDistortedOmniRsCameraGeometry.cpp
 	src/autogen/Frame-MaskedPinholeCameraGeometry.cpp
 	src/autogen/Frame-MaskedDistortedPinholeCameraGeometry.cpp

@@ -191,7 +191,9 @@ void exportFrame() {
   aslam::python::exportFrame<OmniCameraGeometry>("OmniFrame");
   aslam::python::exportFrame<DistortedOmniCameraGeometry>("DistortedOmniFrame");
   aslam::python::exportFrame<Radtan4DistortedOmniCameraGeometry>("Radtan4DistortedOmniFrame");
+  aslam::python::exportFrame<RadtanProDistortedOmniCameraGeometry>("RadtanProDistortedOmniFrame");
   aslam::python::exportFrame<Radtan4DistortedOmniRsCameraGeometry>("Radtan4DistortedOmniRsFrame");
+  aslam::python::exportFrame<RadtanProDistortedOmniRsCameraGeometry>("RadtanProDistortedOmniRsFrame");
   aslam::python::exportFrame<MaskedDistortedOmniCameraGeometry>(
       "MaskedDistortedOmniFrame");
 

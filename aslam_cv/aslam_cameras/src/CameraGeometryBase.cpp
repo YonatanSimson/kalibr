@@ -80,6 +80,14 @@ boost::shared_ptr<CameraGeometryBase> CameraGeometryBase::create(
     rval.reset(
         new CameraGeometry<OmniProjection<RadialTangential4Distortion>,
             RollingShutter, NoMask>(config));
+  } else if (type == "RadtanProDistortedOmni") {
+    rval.reset(
+        new CameraGeometry<OmniProjection<RadialTangentialProDistortion>,
+            GlobalShutter, NoMask>(config));
+  } else if (type == "RadtanProDistortedOmniRs") {
+    rval.reset(
+        new CameraGeometry<OmniProjection<RadialTangentialProDistortion>,
+            RollingShutter, NoMask>(config));
   } else if (type == "EquidistantDistortedOmniRs") {
     rval.reset(
         new CameraGeometry<OmniProjection<EquidistantDistortion>,

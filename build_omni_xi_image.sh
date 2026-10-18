@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build the patched kalibr image from this checkout (see OMNI_FIXED_XI.md).
+# Build the patched kalibr image from this checkout (see OMNI_PATCH.md).
 #   ./build_omni_xi_image.sh [tag]        default tag: kalibr_ubuntu2004_omnixi
 # BASE (default 1f60227, upstream master this branch starts from) selects what counts as changed.
 set -eo pipefail
