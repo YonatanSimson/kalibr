@@ -4,9 +4,6 @@ Changes on top of upstream kalibr (base commit `1f60227`) for calibrating very w
 fisheyes with the MEI model the way camera makers store it. With none of the variables below set,
 existing models behave as stock (regression at the end).
 
-Use case and results (Insta360 X5/X6): exovision-research
-`map_3d/calibration/INSTA360_X6_MEI_CALIBRATION.md`.
-
 ## Models
 
 | kalibr model | distortion | coefficients (`distortion_coeffs`) |
@@ -66,8 +63,8 @@ New camera geometries are registered for boost serialization (`aslam_cv_serializ
 otherwise.
 
 The Docker image (`Dockerfile_omni_xi`) also installs xvfb and replaces upstream's shell-form
-`ENTRYPOINT`, which ignores the command `docker run IMAGE cmd` passes. The arm64 preflight image
-already did both; on amd64 every runner call silently ran nothing.
+`ENTRYPOINT`, which ignores the command `docker run IMAGE cmd` passes; otherwise every runner call
+silently ran nothing.
 
 ## Build and test
 
